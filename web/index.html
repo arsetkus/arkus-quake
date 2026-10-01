@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARKUS Asuransi Gempa</title>
+<meta name="description" content="Asuransi parametrik gempa di BNB Chain: dana cair otomatis ke warga saat gempa terkonfirmasi BMKG dan USGS, tanpa klaim.">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.png" type="image/png" sizes="64x64">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<style>
+:root{
+  --bg:#f6f7f9; --surface:#fff; --surface-2:#f1f3f6; --border:#e3e7ec; --text:#0f172a; --muted:#5b6575;
+  --brand:#0f766e; --brand-soft:#ccfbf1; --quake:#dc2626; --quake-soft:#fee2e2; --paid:#2563eb; --paid-soft:#dbeafe;
+  --warn:#b45309; --warn-soft:#fef3c7; --gray:#94a3b8; --shadow:0 1px 2px rgba(15,23,42,.06),0 4px 16px rgba(15,23,42,.05);
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0b1020; --surface:#121a2c; --surface-2:#18223a; --border:#24314d; --text:#e6ebf5; --muted:#93a0b8;
+  --brand:#2dd4bf; --brand-soft:#0f3b38; --quake:#f87171; --quake-soft:#3b1414; --paid:#60a5fa; --paid-soft:#13284a;
+  --warn:#fbbf24; --warn-soft:#3a2a08; --gray:#64748b; --shadow:none;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-decoration:none} a:hover{text-decoration:underline}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em}
+.wrap{max-width:1200px;margin:0 auto;padding:0 16px}
+header{background:var(--surface);border-bottom:1px solid var(--border)}
+.hdr{display:flex;align-items:center;gap:14px;padding:14px 0;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+.logo img{flex:none;width:32px;height:32px;border-radius:8px;display:block}
+.logo small{display:block;font-weight:500;font-size:12.5px;color:var(--muted)}
+.pills{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-size:12.5px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--gray)} .dot.ok{background:#16a34a} .dot.bad{background:var(--quake)}
+.hero{padding:26px 0 8px}
+.hero h1{margin:0 0 6px;font-size:clamp(22px,3.2vw,30px);letter-spacing:-.02em;line-height:1.2}
+.hero p{margin:0;color:var(--muted);max-width:760px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+.kpi .l{font-size:12.5px;color:var(--muted)} .kpi .v{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:13px;font-weight:500;color:var(--muted);margin-left:4px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+.card h2{font-size:15px;margin:0;padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.card h2 .sp{margin-left:auto;font-weight:500;font-size:12.5px;color:var(--muted)}
+#map{flex:1;min-height:480px}
+.mapcard{display:flex;flex-direction:column}
+.legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--border);font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.side{display:flex;flex-direction:column;gap:16px}
+.body{padding:14px 16px}
+.btn{appearance:none;border:0;border-radius:10px;padding:11px 14px;width:100%;font:600 14.5px Inter,sans-serif;background:#dc2626;color:#fff;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.note{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+.steps{list-style:none;margin:14px 0 0;padding:0}
+.steps li{display:flex;gap:10px;padding:7px 0;font-size:13.5px;color:var(--muted)}
+.steps .b{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:grid;place-items:center;font-size:11px;font-weight:700}
+.steps li.on{color:var(--text)} .steps li.on .b{border-color:var(--warn);color:var(--warn);animation:pulse 1.2s infinite}
+.steps li.done{color:var(--text)} .steps li.done .b{border-color:var(--brand);background:var(--brand);color:#fff}
+@keyframes pulse{50%{box-shadow:0 0 0 5px var(--warn-soft)}}
+.err{background:var(--quake-soft);color:var(--quake);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:10px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.how{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+.how div{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.how b{display:block;font-size:14px;margin-bottom:4px} .how span{font-size:13px;color:var(--muted)}
+.how em{font-style:normal;font-size:11.5px;font-weight:700;color:var(--brand);letter-spacing:.06em}
+.tables{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-bottom:24px}
+.card{min-width:0}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:9px 16px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+th{font-size:12px;font-weight:600;color:var(--muted);background:var(--surface-2)}
+td.num{text-align:right;font-variant-numeric:tabular-nums} th.num{text-align:right}
+tr:last-child td{border-bottom:0}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
+.tag.active{background:var(--brand-soft);color:var(--brand)} .tag.paid{background:var(--paid-soft);color:var(--paid)}
+.tag.expired{background:var(--surface-2);color:var(--muted)} .tag.sim{background:var(--warn-soft);color:var(--warn)}
+.tag.real{background:var(--quake-soft);color:var(--quake)} .tag.veto{background:var(--surface-2);color:var(--muted);text-decoration:line-through}
+.empty{padding:22px 16px;color:var(--muted);font-size:13.5px;text-align:center}
+footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted);font-size:12.5px}
+.leaflet-container{background:var(--surface-2);font:inherit}
+.leaflet-popup-content{font-size:13px;line-height:1.45}
+@media (max-width:960px){.grid{grid-template-columns:1fr}.kpis,.how{grid-template-columns:repeat(2,1fr)}#map{min-height:380px}}
+@media (max-width:520px){.kpis,.how{grid-template-columns:1fr}.pills{margin-left:0}}
+</style>
+</head>
+<body>
+<header><div class="wrap hdr">
+  <div class="logo">
+    <img src="/logo.png" alt="ARKUS Asuransi Gempa" width="32" height="32">
+    <div>ARKUS Asuransi Gempa<small>Proteksi parametrik di BNB Chain</small></div>
+  </div>
+  <div class="pills">
+    <span class="pill"><span class="dot" id="agentDot"></span><span id="agentTxt">Oracle memuat…</span></span>
+    <span class="pill">BSC Testnet · <a id="poolLink" class="mono" target="_blank" rel="noopener">pool</a></span>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Gempa terjadi, dana cair ke warga dalam hitungan menit.</h1>
+    <p>Sponsor (Pemda, CSR, diaspora) membelikan polis untuk warga. Saat BMKG dan USGS sama-sama mengonfirmasi gempa di atas ambang dalam radius polis, smart contract membayar langsung. Tidak ada formulir klaim dan survei kerusakan, dan warga tidak perlu punya aplikasi kripto.</p>
+  </section>
+
+  <div id="setupBox" class="card" hidden style="margin-top:18px;border-color:var(--warn)">
+    <div class="body">
+      <b>Server sudah online. Smart contract belum di-deploy.</b>
+      <p class="note" style="font-size:13.5px">Dashboard aktif setelah dompet relayer diisi tBNB (BSC testnet) dan installer dijalankan ulang.</p>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Alamat relayer</dt><dd class="mono" id="sAddr">belum dibuat</dd>
+        <dt>Saldo</dt><dd id="sBal">–</dd>
+      </dl>
+    </div>
+  </div>
+
+  <section class="kpis">
+    <div class="kpi"><div class="l">Dana di pool</div><div class="v" id="kAssets">–</div></div>
+    <div class="kpi"><div class="l">Dijaminkan untuk polis aktif</div><div class="v" id="kReserved">–</div></div>
+    <div class="kpi"><div class="l">Polis aktif</div><div class="v" id="kActive">–</div></div>
+    <div class="kpi"><div class="l">Sudah dibayar ke warga</div><div class="v" id="kPaid">–</div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card mapcard">
+      <h2>Peta polis &amp; gempa terlapor <span class="sp"><a href="#" id="viewSumbar">Sumbar</a> · <a href="#" id="viewIndo">Indonesia</a></span></h2>
+      <div id="map"></div>
+      <div class="legend">
+        <span><i style="background:var(--brand)"></i>Polis aktif</span>
+        <span><i style="background:var(--paid)"></i>Sudah dibayar</span>
+        <span><i style="background:var(--gray)"></i>Berakhir</span>
+        <span><i style="background:var(--quake)"></i>Gempa terlapor on-chain</span>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <h2>Demo: replay Gempa Padang 2009</h2>
+        <div class="body">
+          <button class="btn" id="replayBtn">Simulasikan gempa M7.6</button>
+          <p class="note" id="replayNote">Data historis 30 Sep 2009 diputar ulang sebagai laporan bertanda <b>simulasi</b>. Hanya bisa di pool demo testnet.</p>
+          <ol class="steps" id="steps">
+            <li data-s="seeding"><span class="b">1</span><span>Siapkan polis warga Sumbar</span></li>
+            <li data-s="signing"><span class="b">2</span><span>Oracle cek data, 3 attester tanda tangan, laporan dikirim on-chain</span></li>
+            <li data-s="challenge"><span class="b">3</span><span>Masa sanggah guardian <b id="cd"></b></span></li>
+            <li data-s="paying"><span class="b">4</span><span>Keeper membayar polis yang memenuhi syarat</span></li>
+            <li data-s="done"><span class="b">5</span><span id="doneTxt">Dana cair ke rekening on-chain warga</span></li>
+          </ol>
+          <div id="replayErr" class="err" hidden></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Oracle agent</h2>
+        <div class="body">
+          <dl class="kv">
+            <dt>Sumber</dt><dd>BMKG + USGS</dd>
+            <dt>Cek terakhir</dt><dd id="aLast">–</dd>
+            <dt>Interval</dt><dd id="aPoll">–</dd>
+            <dt>Attester</dt><dd id="aAtt">–</dd>
+            <dt>Masa sanggah</dt><dd id="aCw">–</dd>
+            <dt>Gas relayer</dt><dd id="aGas">–</dd>
+          </dl>
+          <div id="agentErr" class="err" hidden></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="how">
+    <div><em>01 · DATA</em><b>Dua lembaga</b><span>Gempa hanya dilaporkan kalau BMKG dan USGS sepakat soal waktu, lokasi, dan magnitudo.</span></div>
+    <div><em>02 · KONSERVATIF</em><b>Angka terkecil</b><span>Yang dicatat magnitudo terendah dari keduanya, dengan lokasi resmi BMKG.</span></div>
+    <div><em>03 · MULTI-TANDA TANGAN</em><b>2 dari 3 attester</b><span>Tiap attester mengecek ulang sendiri dan menolak angka yang dinaikkan.</span></div>
+    <div><em>04 · ON-CHAIN</em><b>Kontrak yang memutuskan</b><span>Radius, ambang, dan masa polis dicek oleh smart contract. Bukan AI, bukan admin.</span></div>
+  </section>
+
+  <section class="tables">
+    <div class="card">
+      <h2>Laporan gempa on-chain <span class="sp" id="rCount"></span></h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Waktu lapor (WIB)</th><th class="num">Magnitudo</th><th>Episentrum</th><th>Jenis</th><th class="num">Polis dibayar</th><th>Transaksi</th></tr></thead>
+        <tbody id="rBody"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>Polis <span class="sp" id="pCount"></span></h2>
+      <div class="tbl"><table>
+        <thead><tr><th>#</th><th>Penerima</th><th class="num">Radius</th><th class="num">Ambang</th><th class="num">Nilai cair</th><th>Status</th><th>Alamat penerima</th></tr></thead>
+        <tbody id="pBody"></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  Prototype hackathon (Indonesia Web3 Hackathon 2026, BNB Chain). Berjalan di testnet dengan stablecoin tiruan (mUSDT). Belum diaudit dan bukan produk asuransi berizin OJK.
+</div></footer>
+
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const nf = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+const tfmt = (s) => new Date(s * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const short = (a) => a ? a.slice(0, 6) + '…' + a.slice(-4) : '';
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let S = null, lastKey = '', EXP = 'https://testnet.bscscan.com';
+
+const SUMBAR = [[-2.6, 98.6], [0.6, 101.6]];
+const INDO = [[-11, 95], [6, 141]];
+const map = L.map('map', { scrollWheelZoom: false }).fitBounds(SUMBAR);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 12, attribution: '&copy; OpenStreetMap' }).addTo(map);
+const layer = L.layerGroup().addTo(map);
+$('viewSumbar').onclick = (e) => { e.preventDefault(); map.fitBounds(SUMBAR); };
+$('viewIndo').onclick = (e) => { e.preventDefault(); map.fitBounds(INDO); };
+
+function drawMap(s) {
+  layer.clearLayers();
+  const col = { active: css('--brand'), paid: css('--paid'), expired: css('--gray') };
+  for (const p of s.policies) {
+    L.circle([p.lat, p.lon], { radius: p.radiusKm * 1000, color: col[p.status], weight: 1.5, fillOpacity: p.status === 'active' ? .12 : .06 })
+      .bindPopup(`<b>${p.label || 'Polis #' + p.id}</b><br>Radius ${p.radiusKm} km · ambang M${p.minMag.toFixed(1)}<br>Nilai cair ${nf.format(p.coverage)} mUSDT<br>Status: ${p.status === 'paid' ? 'sudah dibayar' : p.status === 'active' ? 'aktif' : 'berakhir'}`)
+      .addTo(layer);
+    L.circleMarker([p.lat, p.lon], { radius: 3, color: col[p.status], fillOpacity: 1, weight: 0 }).addTo(layer);
+  }
+  s.reports.forEach((r, i) => {
+    L.circleMarker([r.lat, r.lon], { radius: 4 + (r.mag - 4) * 3, color: css('--quake'), weight: 2, fillOpacity: i === 0 ? .55 : .25 })
+      .bindPopup(`<b>M${r.mag.toFixed(1)}</b> ${r.simulated ? '(simulasi)' : ''}<br>${r.lat.toFixed(2)}, ${r.lon.toFixed(2)}<br>${r.paidCount} polis dibayar<br><a target="_blank" rel="noopener" href="${EXP}/tx/${r.tx}">lihat transaksi</a>`)
+      .addTo(layer);
+  });
+}
+
+function drawTables(s) {
+  $('rCount').textContent = s.reports.length + ' laporan';
+  $('rBody').innerHTML = s.reports.length ? s.reports.map((r) => `<tr>
+    <td>${tfmt(r.reportedAt)}</td><td class="num"><b>${r.mag.toFixed(1)}</b></td>
+    <td class="mono">${r.lat.toFixed(2)}, ${r.lon.toFixed(2)}</td>
+    <td>${r.vetoed ? '<span class="tag veto">diveto</span>' : r.simulated ? '<span class="tag sim">simulasi</span>' : '<span class="tag real">gempa nyata</span>'}</td>
+    <td class="num">${r.paidCount} · ${nf.format(r.paidAmount)} mUSDT</td>
+    <td><a class="mono" target="_blank" rel="noopener" href="${EXP}/tx/${r.tx}">${short(r.tx)}</a></td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">Belum ada gempa yang memenuhi syarat dilaporkan. Oracle terus memantau BMKG dan USGS.</td></tr>';
+  $('pCount').textContent = s.totals.active + ' aktif dari ' + s.policies.length;
+  const st = { active: '<span class="tag active">aktif</span>', paid: '<span class="tag paid">dibayar</span>', expired: '<span class="tag expired">berakhir</span>' };
+  $('pBody').innerHTML = s.policies.length ? s.policies.map((p) => `<tr>
+    <td>${p.id}</td><td>${p.label || '–'}</td><td class="num">${p.radiusKm} km</td><td class="num">M${p.minMag.toFixed(1)}</td>
+    <td class="num">${nf.format(p.coverage)}</td>
+    <td>${st[p.status]}${p.paidTx ? ` <a class="mono" target="_blank" rel="noopener" href="${EXP}/tx/${p.paidTx}">tx</a>` : ''}</td>
+    <td><a class="mono" target="_blank" rel="noopener" href="${EXP}/address/${p.beneficiary}">${short(p.beneficiary)}</a></td></tr>`).join('')
+    : '<tr><td colspan="7" class="empty">Belum ada polis.</td></tr>';
+}
+
+function drawReplay(s) {
+  const r = s.replay, order = ['seeding', 'signing', 'challenge', 'paying', 'done'];
+  const cur = order.indexOf(r.stage);
+  document.querySelectorAll('#steps li').forEach((li) => {
+    const i = order.indexOf(li.dataset.s);
+    li.className = r.stage === 'idle' || cur < 0 ? '' : i < cur || r.stage === 'done' ? 'done' : i === cur ? 'on' : '';
+  });
+  const wait = Math.max(0, Math.ceil((r.nextAllowedAt - Date.now()) / 1000));
+  const btn = $('replayBtn');
+  btn.disabled = r.running || wait > 0;
+  btn.textContent = r.running ? 'Simulasi berjalan…' : wait > 0 ? `Bisa diulang dalam ${Math.ceil(wait / 60)} menit` : 'Simulasikan gempa M7.6';
+  $('cd').textContent = r.stage === 'challenge' && r.claimsAt ? '· ' + Math.max(0, Math.ceil((r.claimsAt - Date.now()) / 1000)) + ' dtk' : '';
+  const rep = r.eventId && s.reports.find((x) => x.eventId === r.eventId);
+  $('doneTxt').innerHTML = rep && r.stage === 'done' ? `Dana cair ke <b>${rep.paidCount} warga</b>, total ${nf.format(rep.paidAmount)} mUSDT` : 'Dana cair ke rekening on-chain warga';
+  $('replayErr').hidden = !r.error; $('replayErr').textContent = r.error || '';
+}
+
+function drawSetup(s) {
+  $('setupBox').hidden = false;
+  document.querySelectorAll('.kpis,.grid,.tables').forEach((el) => { el.style.display = 'none'; });
+  $('agentDot').className = 'dot'; $('agentTxt').textContent = 'Menunggu deploy kontrak';
+  $('poolLink').textContent = 'belum ada';
+  if (s.relayer) {
+    $('sAddr').innerHTML = `<a target="_blank" rel="noopener" href="${s.chain.explorer}/address/${s.relayer.address}">${s.relayer.address}</a>`;
+    $('sBal').textContent = s.relayer.gasBnb == null ? 'tidak terbaca' : s.relayer.gasBnb.toFixed(4) + ' tBNB';
+  }
+}
+
+function draw(s) {
+  if (s.setup) return drawSetup(s);
+  S = s; EXP = s.chain.explorer;
+  $('poolLink').textContent = short(s.pool.address); $('poolLink').href = `${EXP}/address/${s.pool.address}`;
+  $('kAssets').innerHTML = nf.format(s.pool.totalAssets) + '<small>mUSDT</small>';
+  $('kReserved').innerHTML = nf.format(s.pool.reserved) + '<small>mUSDT</small>';
+  $('kActive').textContent = nf.format(s.totals.active);
+  $('kPaid').innerHTML = nf.format(s.totals.paid) + '<small>mUSDT</small>';
+  const a = s.agent, healthy = a.lastOk && Date.now() - a.lastOk < (a.pollSeconds * 3 + 60) * 1000;
+  $('agentDot').className = 'dot ' + (healthy ? 'ok' : 'bad');
+  $('agentTxt').textContent = healthy ? 'Oracle aktif' : 'Oracle bermasalah';
+  $('aLast').textContent = a.lastCycleAt ? new Date(a.lastCycleAt).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB' : '–';
+  $('aPoll').textContent = 'tiap ' + a.pollSeconds + ' dtk';
+  $('aAtt').textContent = `${s.pool.threshold} dari ${s.pool.attesterCount}`;
+  $('aCw').textContent = s.pool.challengeWindow < 120 ? s.pool.challengeWindow + ' detik' : Math.round(s.pool.challengeWindow / 60) + ' menit';
+  $('aGas').textContent = s.relayer.gasBnb.toFixed(4) + ' tBNB';
+  $('agentErr').hidden = !a.lastError; $('agentErr').textContent = a.lastError ? 'Siklus terakhir: ' + a.lastError : '';
+  const key = JSON.stringify([s.policies.map((p) => p.id + p.status), s.reports.map((r) => r.eventId + r.paidCount)]);
+  if (key !== lastKey) { lastKey = key; drawMap(s); } // redraw only on change so open popups stay open
+  drawTables(s); drawReplay(s);
+}
+
+async function refresh() {
+  try { const r = await fetch('/api/status'); if (r.ok) draw(await r.json()); } catch (e) { /* keep last view */ }
+}
+$('replayBtn').onclick = async () => {
+  $('replayBtn').disabled = true;
+  const r = await fetch('/api/replay', { method: 'POST' });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); $('replayErr').hidden = false; $('replayErr').textContent = j.error || 'Gagal memulai'; }
+  refresh();
+};
+refresh(); setInterval(refresh, 5000);
+setInterval(() => S && drawReplay(S), 1000);
+</script>
+</body>
+</html>

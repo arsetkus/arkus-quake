@@ -1,0 +1,6 @@
+{
+  "name": "padang-2009",
+  "note": "Gempa Padang 30 Sep 2009 (Mw 7.6). Angka dibulatkan untuk demo replay; cek ulang ke katalog resmi USGS/BMKG sebelum dipakai di materi pitch.",
+  "bmkg": { "source": "BMKG", "id": "2009-09-30T10:16:09+00:00|-0.84,99.65", "timeMs": 1254305769000, "lat": -0.84, "lon": 99.65, "depthKm": 71, "mag": 7.6, "place": "57 km Barat Daya Pariaman", "status": "official" },
+  "usgs": { "source": "USGS", "id": "replay-padang-2009", "timeMs": 1254305769000, "lat": -0.725, "lon": 99.867, "depthKm": 81, "mag": 7.6, "place": "southern Sumatra, Indonesia", "status": "reviewed" }
+}

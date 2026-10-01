@@ -1,0 +1,17 @@
+{
+  "network": "BNB Smart Chain Testnet",
+  "chainId": 97,
+  "explorer": "https://testnet.bscscan.com",
+  "dashboard": "https://arkuss.app",
+  "pool": "0x5f9Cf5136DEc36B0e8f1303d42E936fE65190d0F",
+  "poolCreationTx": "0xa685a5f4c761d1033e5f8050ebba3f2abd26f1ffaf62c73cab48a3afba07b633",
+  "poolBlock": 134281952,
+  "usdt": "0x0EAf353F1aD0413DE01132a2DF16f73cc0963E6b",
+  "relayer": "0x0dF91E14Cb6b6b208e8D95F7388601Bb73DfBac4",
+  "attesters": [
+    "0x4C1294F8399ae08e97F4093074Fd8347B116432B",
+    "0xbb6923171397FF9A462dd32A79aE279E5ED45e31",
+    "0xC21BE19742A3B7AD0815D7f4421c0Fbd0939dB72"
+  ],
+  "params": { "waitingPeriod": 0, "challengeWindowSeconds": 180, "allowSimulated": true, "threshold": 2 }
+}

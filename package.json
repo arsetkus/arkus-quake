@@ -1,0 +1,30 @@
+{
+  "name": "arkus-quake-parametric",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Asuransi parametrik gempa di BNB Chain: pool kontrak + oracle agent BMKG/USGS",
+  "scripts": {
+    "compile": "node compile.js",
+    "test": "node compile.js && node test.js && node agent/test-agent.js",
+    "start": "node server/index.js",
+    "deploy": "node scripts/deploy.js",
+    "agent:dry": "node agent/index.js dry",
+    "agent:once": "node agent/index.js once",
+    "agent:watch": "node agent/index.js watch",
+    "agent:replay": "node agent/index.js replay padang-2009",
+    "agent:keeper": "node agent/index.js keeper",
+    "verify": "node scripts/verify.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "5.0.2",
+    "ethers": "^6.13.0",
+    "solc": "0.8.26"
+  },
+  "devDependencies": {
+    "ganache": "^7.9.2"
+  },
+  "license": "MIT"
+}
