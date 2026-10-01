@@ -41,7 +41,8 @@ function standardInput(file) {
   return {
     language: 'Solidity', sources,
     settings: { evmVersion: 'paris', optimizer: { enabled: true, runs: 200 },
-      outputSelection: { '*': { '*': ['abi', 'evm.bytecode.object', 'evm.deployedBytecode.object'] } } },
+      // full output like Hardhat sends; BscScan reads more than bytecode.object (does not change the bytecode)
+      outputSelection: { '*': { '*': ['abi', 'evm.bytecode', 'evm.deployedBytecode', 'evm.methodIdentifiers', 'metadata'], '': ['ast'] } } },
   };
 }
 
@@ -80,7 +81,7 @@ async function verify(provider, file, name, address, creationTx) {
   const dir = path.join(ROOT, 'build', 'verify');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, `${name}.input.json`), JSON.stringify(input));
-  fs.writeFileSync(path.join(dir, `${name}.args.txt`), args + '\n');
+  fs.writeFileSync(path.join(dir, `${name}.args.txt`), args);
   console.log(`${name} ${address}\n   compiler ${COMPILER}, license MIT, optimizer 200 runs, evm paris`);
   console.log(`   files: build/verify/${name}.input.json, build/verify/${name}.args.txt${args ? '' : ' (no constructor args)'}`);
   if (!KEY) return;
