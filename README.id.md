@@ -64,6 +64,7 @@ npm run agent:keeper     # bayar semua polis yang eligible
 
 ## Batasan yang perlu diketahui (untuk Q&A juri)
 
+- **Pencairan masih biner, belum bertingkat.** Polis cair 100% kalau gempa memenuhi ambang magnitudo di dalam radius, selain itu tidak cair sama sekali. Sponsor sudah bisa mengatur radius dan ambang per polis (premi dihitung `quotePremium`), tapi warga yang sedikit di luar radius tidak dapat apa-apa (*basis risk*). Versi berikutnya: pencairan bertingkat menurut jarak dan magnitudo, misalnya 100% dalam 50 km, 50% dalam 100 km, 25% dalam 150 km.
 - Owner bisa ganti attester/threshold seketika. Untuk produksi: owner = multisig + timelock.
 - Kalau keeper mati > 14 hari setelah polis berakhir, polis eligible bisa ter-release tanpa dibayar. Siapa pun bisa menjalankan keeper.
 - Harga premi masih placeholder, belum aktuaria.

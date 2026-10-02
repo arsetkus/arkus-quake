@@ -145,6 +145,7 @@ deployments/bsc-testnet.json       live contract addresses
 
 ## Known limitations (and the production path)
 
+- **Binary payout, no tiers yet.** A policy pays 100% of its coverage when the quake meets its magnitude threshold inside its radius, otherwise nothing. Sponsors already tune radius and threshold per policy (priced by `quotePremium`), but a resident just outside the radius gets nothing (basis risk). Next version: tiered payouts by distance and magnitude, e.g. 100% within 50 km, 50% within 100 km, 25% within 150 km.
 - The owner can change attesters and threshold instantly. Production: owner = multisig + timelock.
 - The demo runs all attester keys in one process. Production: each attester is a separate institution and server (e.g. university, BPBD, insurer).
 - Premiums use a placeholder rate table (`ratePerYearBps`), not actuarial pricing.
