@@ -260,11 +260,13 @@
     if (!ethers.isAddress(a)) { $('cOut').innerHTML = '<p class="note">Alamat belum valid.</p>'; return; }
     const lo = a.toLowerCase();
     const mine = S.policies.filter((p) => p.beneficiary.toLowerCase() === lo || p.sponsor.toLowerCase() === lo);
-    const tag = { active: '<span class="tag active">aktif</span>', paid: '<span class="tag paid">sudah dibayar</span>', expired: '<span class="tag expired">berakhir</span>' };
+    const tag = { active: '<span class="tag active">aktif</span>', paid: '<span class="tag paid">sudah dibayar</span>', expired: '<span class="tag expired">berakhir</span>',
+      sim: '<span class="tag sim">dibayar (simulasi)</span>' };
+    const sim = new Set(S.reports.filter((r) => r.simulated).map((r) => r.eventId));
     const date = (t) => new Date(t * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
     $('cOut').innerHTML = `<p class="note" style="margin:0">Saldo mUSDT alamat ini: <b id="cBal">…</b></p>` + (mine.length ? mine.map((p) => {
       const role = p.beneficiary.toLowerCase() === lo ? (p.sponsor.toLowerCase() === lo ? 'penerima & sponsor' : 'penerima') : 'sponsor';
-      return `<div class="pol"><div class="t"><a href="#" data-fly="${p.id}">${esc(p.label || 'Polis #' + p.id)}</a>${tag[p.status]}</div>
+      return `<div class="pol"><div class="t"><a href="#" data-fly="${p.id}">${esc(p.label || 'Polis #' + p.id)}</a>${tag[p.status === 'paid' && sim.has(p.paidEvent) ? 'sim' : p.status]}</div>
         <div class="m">Nilai cair <b>${nf.format(p.coverage)} mUSDT</b> · gempa M${p.minMag.toFixed(1)}+ dalam ${p.radiusKm} km</div>
         <div class="m">${p.status === 'paid' ? `Dibayar ${p.paidAt ? date(p.paidAt) : ''} · ${txLink(p.paidTx)}` : 'Berlaku sampai ' + date(p.end)} · kamu: ${role}</div></div>`;
     }).join('') : '<p class="note">Belum ada polis untuk alamat ini.</p>');

@@ -106,6 +106,9 @@ footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted)
 .pol .t{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600;margin-bottom:4px}
 .pol .m{color:var(--muted)}
 .leaflet-container.picking{cursor:crosshair}
+.navmode{font-weight:700;letter-spacing:.06em;color:var(--warn);border-color:var(--warn)} .navmode:hover{text-decoration:none;background:var(--warn-soft)}
+.banner{margin-top:14px;border-color:var(--warn);background:var(--warn-soft)} .banner .body{font-size:13.5px}
+body:not(.demo) #replayCard,body:not(.demo) #demoBanner{display:none} body.demo #replayCard{order:-1}
 @media (max-width:960px){.grid{grid-template-columns:1fr}.kpis,.how{grid-template-columns:repeat(2,1fr)}#map{min-height:380px}}
 @media (max-width:520px){.kpis,.how{grid-template-columns:1fr}.pills{margin-left:0}}
 </style>
@@ -119,6 +122,7 @@ footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted)
   <div class="pills">
     <span class="pill"><span class="dot" id="agentDot"></span><span id="agentTxt">Oracle memuat…</span></span>
     <span class="pill">BSC Testnet · <a id="poolLink" class="mono" target="_blank" rel="noopener">pool</a></span>
+    <a class="pill navmode" id="modeLink" href="/demo" title="Halaman simulasi untuk presentasi">DEMO</a>
     <button class="pill wbtn" id="walletBtn">Hubungkan wallet</button>
   </div>
 </div></header>
@@ -128,6 +132,10 @@ footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted)
     <h1>Gempa terjadi, dana cair ke warga dalam hitungan menit.</h1>
     <p>Sponsor (Pemda, CSR, diaspora) membelikan polis untuk warga. Saat BMKG dan USGS sama-sama mengonfirmasi gempa di atas ambang dalam radius polis, smart contract membayar langsung. Tidak ada formulir klaim dan survei kerusakan, dan warga tidak perlu punya aplikasi kripto.</p>
   </section>
+
+  <div id="demoBanner" class="card banner"><div class="body">
+    <b>Mode demo.</b> Halaman ini untuk presentasi: putar ulang gempa Padang 2009 (M7,6) dan lihat dana cair ke polis warga Sumatra Barat. Laporan simulasi ditandai <b>simulasi</b> di blockchain dan hanya diterima pool testnet ini. <a href="/">Kembali ke data live</a>.
+  </div></div>
 
   <div id="setupBox" class="card" hidden style="margin-top:18px;border-color:var(--warn)">
     <div class="body">
@@ -144,7 +152,7 @@ footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted)
     <div class="kpi"><div class="l">Dana di pool</div><div class="v" id="kAssets">–</div></div>
     <div class="kpi"><div class="l">Dijaminkan untuk polis aktif</div><div class="v" id="kReserved">–</div></div>
     <div class="kpi"><div class="l">Polis aktif</div><div class="v" id="kActive">–</div></div>
-    <div class="kpi"><div class="l">Sudah dibayar ke warga</div><div class="v" id="kPaid">–</div></div>
+    <div class="kpi"><div class="l" id="kPaidL">Sudah dibayar ke warga</div><div class="v" id="kPaid">–</div></div>
   </section>
 
   <section class="grid">
@@ -199,7 +207,7 @@ footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted)
         </div>
         <div class="wbar" id="wBar" hidden></div>
       </div>
-      <div class="card">
+      <div class="card" id="replayCard">
         <h2>Demo: replay Gempa Padang 2009</h2>
         <div class="body">
           <button class="btn" id="replayBtn">Simulasikan gempa M7.6</button>
@@ -272,7 +280,15 @@ let S = null, lastKey = '', EXP = 'https://testnet.bscscan.com';
 
 const SUMBAR = [[-2.6, 98.6], [0.6, 101.6]];
 const INDO = [[-11, 95], [6, 141]];
-const map = L.map('map', { scrollWheelZoom: false }).fitBounds(SUMBAR);
+// '/' shows only real quakes and payouts; '/demo' adds the Padang 2009 replay for presentations
+const DEMO = location.pathname.replace(/\/+$/, '') === '/demo';
+if (DEMO) {
+  document.body.classList.add('demo');
+  document.title = 'Demo · ARKUS Asuransi Gempa';
+  $('modeLink').textContent = '← LIVE'; $('modeLink').href = '/'; $('modeLink').title = 'Kembali ke data live';
+  $('kPaidL').textContent = 'Sudah dibayar (termasuk simulasi)';
+}
+const map = L.map('map', { scrollWheelZoom: false }).fitBounds(DEMO ? SUMBAR : INDO);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 12, attribution: '&copy; OpenStreetMap' }).addTo(map);
 const layer = L.layerGroup().addTo(map);
 $('viewSumbar').onclick = (e) => { e.preventDefault(); map.fitBounds(SUMBAR); };
@@ -341,9 +357,18 @@ function drawSetup(s) {
   }
 }
 
-function draw(s) {
-  if (s.setup) return drawSetup(s);
-  S = s; EXP = s.chain.explorer;
+// live view: drop simulated reports and the policies they paid, so every number on '/' is real
+function liveView(s) {
+  const sim = new Set(s.reports.filter((r) => r.simulated).map((r) => r.eventId));
+  const policies = s.policies.filter((p) => !(p.status === 'paid' && sim.has(p.paidEvent)));
+  const paid = policies.filter((p) => p.status === 'paid').reduce((t, p) => t + p.coverage, 0);
+  return { ...s, policies, reports: s.reports.filter((r) => !r.simulated), totals: { ...s.totals, paid, policies: policies.length } };
+}
+
+function draw(full) {
+  if (full.setup) return drawSetup(full);
+  S = full; EXP = full.chain.explorer; // S keeps everything (Cek polis shows simulated payouts too)
+  const s = DEMO ? full : liveView(full);
   $('poolLink').textContent = short(s.pool.address); $('poolLink').href = `${EXP}/address/${s.pool.address}`;
   $('kAssets').innerHTML = nf.format(s.pool.totalAssets) + '<small>mUSDT</small>';
   $('kReserved').innerHTML = nf.format(s.pool.reserved) + '<small>mUSDT</small>';
@@ -360,8 +385,8 @@ function draw(s) {
   $('agentErr').hidden = !a.lastError; $('agentErr').textContent = a.lastError ? 'Siklus terakhir: ' + a.lastError : '';
   const key = JSON.stringify([s.policies.map((p) => p.id + p.status), s.reports.map((r) => r.eventId + r.paidCount)]);
   if (key !== lastKey) { lastKey = key; drawMap(s); } // redraw only on change so open popups stay open
-  drawTables(s); drawReplay(s);
-  if (window.afterDraw) afterDraw(s);
+  drawTables(s); drawReplay(full);
+  if (window.afterDraw) afterDraw(full);
 }
 
 async function refresh() {

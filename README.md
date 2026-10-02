@@ -97,14 +97,14 @@ Example run: replay of the 2009 Padang M7.6 earthquake, [report tx](https://test
 
 ## Try it
 
-Open [arkuss.app](https://arkuss.app): map of active policies, real quakes reported by the oracle, pool balances. No account or sign-up: your wallet is your identity, and beneficiaries only need an address.
+Open [arkuss.app](https://arkuss.app) for the **live** state: real quakes reported by the oracle, active policies, pool balances and real payouts only. The **[DEMO]** button in the top bar opens [arkuss.app/demo](https://arkuss.app/demo), the presentation page with the historical replay (simulated reports and their payouts are shown only there). No account or sign-up: your wallet is your identity, and beneficiaries only need an address.
 
 | Who | What they do on the dashboard |
 |---|---|
 | **Sponsor** (local government, CSR, diaspora) | **Beli polis**: connect a wallet (MetaMask, Trust, Binance Wallet; switches to BSC Testnet automatically), click the map to choose the protected location, set radius, magnitude threshold, coverage and duration. The premium is quoted live by the contract (`quotePremium`). One click gets test mUSDT from the faucet if needed, approves, and buys. An optional policy name is stored off-chain, proven by a signature from the sponsor wallet. |
 | **Resident** | **Cek polis**: paste an address to see its policies, status, payouts and mUSDT balance. |
 | **Liquidity provider** | **Jadi LP**: deposit or withdraw mUSDT, see pool share, free liquidity and the post-quake withdrawal lock. |
-| **Anyone** | **Simulasikan gempa M7.6**: the oracle replays Padang 2009, attesters sign, the report goes on-chain, the challenge window counts down, and the keeper pays every eligible policy, including ones you bought yourself. Every step links to BscScan. |
+| **Anyone** (on [/demo](https://arkuss.app/demo)) | **Simulasikan gempa M7.6**: the oracle replays Padang 2009, attesters sign, the report goes on-chain, the challenge window counts down, and the keeper pays every eligible policy, including ones you bought yourself. Every step links to BscScan. |
 
 You need a little test BNB for gas ([BNB testnet faucet](https://www.bnbchain.org/en/testnet-faucet)); test mUSDT is minted from the dashboard.
 

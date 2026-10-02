@@ -234,7 +234,8 @@ const server = http.createServer(async (req, res) => {
       runReplay(); cache.at = 0;
       return send(res, 202, { started: true });
     }
-    let file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
+    // '/demo' is the same page in presentation mode (the page reads its own path)
+    let file = url.pathname === '/' || /^\/demo\/?$/.test(url.pathname) ? 'index.html' : url.pathname.slice(1);
     file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
     const full = path.join(WEB, file);
     if (!full.startsWith(WEB) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) return send(res, 404, { error: 'not found' });

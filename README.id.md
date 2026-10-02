@@ -1,6 +1,6 @@
 # Asuransi Parametrik Gempa — BNB Chain (prototype hackathon)
 
-[English](README.md) · **Bahasa Indonesia** · Demo: https://arkuss.app
+[English](README.md) · **Bahasa Indonesia** · Live: https://arkuss.app · Demo presentasi: https://arkuss.app/demo
 
 Pool asuransi parametrik: sponsor (Pemda, CSR, diaspora) membelikan polis untuk warga. Kalau gempa dengan magnitudo ≥ ambang terjadi dalam radius polis, dana cair otomatis ke penerima tanpa klaim, tanpa survei. **Belum diaudit, bukan produk asuransi berizin.**
 
