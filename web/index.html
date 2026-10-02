@@ -84,6 +84,28 @@ tr:last-child td{border-bottom:0}
 footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted);font-size:12.5px}
 .leaflet-container{background:var(--surface-2);font:inherit}
 .leaflet-popup-content{font-size:13px;line-height:1.45}
+.wbtn{cursor:pointer;font:500 12.5px Inter,sans-serif;color:var(--text)} .wbtn:hover{border-color:var(--brand)}
+.tabs{display:flex;border-bottom:1px solid var(--border)}
+.tabs button{flex:1;appearance:none;background:none;border:0;border-bottom:2px solid transparent;padding:12px 6px 10px;font:600 13.5px Inter,sans-serif;color:var(--muted);cursor:pointer}
+.tabs button.on{color:var(--brand);border-bottom-color:var(--brand)}
+.f{margin-bottom:10px} .f label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:4px}
+.f input,.f select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:14px Inter,sans-serif}
+.f input.mono{font:12.5px "JetBrains Mono",monospace}
+.f input[type=range]{padding:0;border:0;accent-color:var(--brand)}
+.f .lnk{font-size:12px;display:inline-block;margin-top:4px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.loc{padding:8px 10px;border:1px dashed var(--border);border-radius:8px;font-size:13px;color:var(--muted)} .loc.set{border-style:solid;color:var(--text)}
+.quote{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;margin-top:4px;border-top:1px solid var(--border);font-size:13px;color:var(--muted)}
+.quote b{font-size:18px;color:var(--text);font-variant-numeric:tabular-nums}
+.btn.brand{background:var(--brand)} .btn.ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+.msg{border-radius:8px;padding:8px 10px;font-size:13px;margin-top:10px;background:var(--surface-2)}
+.msg.ok{background:var(--brand-soft);color:var(--text)} .msg.bad{background:var(--quake-soft);color:var(--quake)}
+.wbar{padding:10px 16px;border-top:1px solid var(--border);font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px}
+.wbar a{cursor:pointer}
+.pol{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px}
+.pol .t{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600;margin-bottom:4px}
+.pol .m{color:var(--muted)}
+.leaflet-container.picking{cursor:crosshair}
 @media (max-width:960px){.grid{grid-template-columns:1fr}.kpis,.how{grid-template-columns:repeat(2,1fr)}#map{min-height:380px}}
 @media (max-width:520px){.kpis,.how{grid-template-columns:1fr}.pills{margin-left:0}}
 </style>
@@ -97,6 +119,7 @@ footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted)
   <div class="pills">
     <span class="pill"><span class="dot" id="agentDot"></span><span id="agentTxt">Oracle memuat…</span></span>
     <span class="pill">BSC Testnet · <a id="poolLink" class="mono" target="_blank" rel="noopener">pool</a></span>
+    <button class="pill wbtn" id="walletBtn">Hubungkan wallet</button>
   </div>
 </div></header>
 
@@ -137,6 +160,45 @@ footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted)
     </div>
 
     <div class="side">
+      <div class="card" id="joinCard">
+        <div class="tabs" id="tabs">
+          <button data-t="buy" class="on">Beli polis</button>
+          <button data-t="check">Cek polis</button>
+          <button data-t="lp">Jadi LP</button>
+        </div>
+        <div class="body" data-p="buy">
+          <div class="f"><label>Lokasi yang dilindungi</label><div class="loc" id="bLoc">Klik peta untuk memilih lokasi</div></div>
+          <div class="f"><label>Radius <b id="bRadV">50 km</b></label><input type="range" id="bRad" min="10" max="300" step="5" value="50"></div>
+          <div class="row2">
+            <div class="f"><label>Ambang gempa</label><select id="bMag"></select></div>
+            <div class="f"><label>Masa polis</label><select id="bDur"><option value="30">30 hari</option><option value="90">90 hari</option><option value="180">180 hari</option><option value="365" selected>1 tahun</option></select></div>
+          </div>
+          <div class="f"><label>Nilai cair <span id="bFree"></span></label><input type="number" id="bCov" min="10" step="50" value="500" inputmode="decimal"></div>
+          <div class="f"><label>Alamat wallet penerima</label><input id="bBen" class="mono" placeholder="0x… (warga tidak perlu aplikasi)" autocomplete="off" spellcheck="false">
+            <a href="#" class="lnk" id="bBenMe">pakai alamat saya</a></div>
+          <div class="f"><label>Nama polis <span>opsional</span></label><input id="bLabel" maxlength="40" placeholder="mis. Keluarga Pak Budi, Padang"></div>
+          <div class="quote"><span>Premi (dibayar sponsor)</span><b id="bPrem">–</b></div>
+          <button class="btn brand" id="bBuy">Hubungkan wallet</button>
+          <div id="bMsg" class="msg" hidden></div>
+        </div>
+        <div class="body" data-p="check" hidden>
+          <div class="f"><label>Alamat penerima atau sponsor</label><input id="cAddr" class="mono" placeholder="0x…" autocomplete="off" spellcheck="false"></div>
+          <div id="cOut"><p class="note">Masukkan alamat untuk melihat polis dan pembayaran yang diterima.</p></div>
+        </div>
+        <div class="body" data-p="lp" hidden>
+          <dl class="kv">
+            <dt>Dana di pool</dt><dd id="lTot">–</dd>
+            <dt>Bebas (tidak menjamin polis)</dt><dd id="lFree">–</dd>
+            <dt>Bagian saya</dt><dd id="lMine">–</dd>
+            <dt>Penarikan</dt><dd id="lLock">–</dd>
+          </dl>
+          <div class="f" style="margin-top:12px"><label>Jumlah <a href="#" id="lMax">tarik semua</a></label><input type="number" id="lAmt" min="1" step="100" value="1000" inputmode="decimal"></div>
+          <div class="row2"><button class="btn brand" id="lDep">Setor</button><button class="btn ghost" id="lWd">Tarik</button></div>
+          <div id="lMsg" class="msg" hidden></div>
+          <p class="note">LP menerima premi dari setiap polis dan menanggung pembayaran saat gempa. Setelah ada laporan gempa, penarikan dikunci sampai masa klaim selesai.</p>
+        </div>
+        <div class="wbar" id="wBar" hidden></div>
+      </div>
       <div class="card">
         <h2>Demo: replay Gempa Padang 2009</h2>
         <div class="body">
@@ -203,6 +265,7 @@ footer{border-top:1px solid var(--border);padding:18px 0 28px;color:var(--muted)
 const $ = (id) => document.getElementById(id);
 const nf = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 const tfmt = (s) => new Date(s * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const short = (a) => a ? a.slice(0, 6) + '…' + a.slice(-4) : '';
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 let S = null, lastKey = '', EXP = 'https://testnet.bscscan.com';
@@ -220,7 +283,7 @@ function drawMap(s) {
   const col = { active: css('--brand'), paid: css('--paid'), expired: css('--gray') };
   for (const p of s.policies) {
     L.circle([p.lat, p.lon], { radius: p.radiusKm * 1000, color: col[p.status], weight: 1.5, fillOpacity: p.status === 'active' ? .12 : .06 })
-      .bindPopup(`<b>${p.label || 'Polis #' + p.id}</b><br>Radius ${p.radiusKm} km · ambang M${p.minMag.toFixed(1)}<br>Nilai cair ${nf.format(p.coverage)} mUSDT<br>Status: ${p.status === 'paid' ? 'sudah dibayar' : p.status === 'active' ? 'aktif' : 'berakhir'}`)
+      .bindPopup(`<b>${esc(p.label || 'Polis #' + p.id)}</b><br>Radius ${p.radiusKm} km · ambang M${p.minMag.toFixed(1)}<br>Nilai cair ${nf.format(p.coverage)} mUSDT<br>Status: ${p.status === 'paid' ? 'sudah dibayar' : p.status === 'active' ? 'aktif' : 'berakhir'}`)
       .addTo(layer);
     L.circleMarker([p.lat, p.lon], { radius: 3, color: col[p.status], fillOpacity: 1, weight: 0 }).addTo(layer);
   }
@@ -243,7 +306,7 @@ function drawTables(s) {
   $('pCount').textContent = s.totals.active + ' aktif dari ' + s.policies.length;
   const st = { active: '<span class="tag active">aktif</span>', paid: '<span class="tag paid">dibayar</span>', expired: '<span class="tag expired">berakhir</span>' };
   $('pBody').innerHTML = s.policies.length ? s.policies.map((p) => `<tr>
-    <td>${p.id}</td><td>${p.label || '–'}</td><td class="num">${p.radiusKm} km</td><td class="num">M${p.minMag.toFixed(1)}</td>
+    <td>${p.id}</td><td>${esc(p.label || '–')}</td><td class="num">${p.radiusKm} km</td><td class="num">M${p.minMag.toFixed(1)}</td>
     <td class="num">${nf.format(p.coverage)}</td>
     <td>${st[p.status]}${p.paidTx ? ` <a class="mono" target="_blank" rel="noopener" href="${EXP}/tx/${p.paidTx}">tx</a>` : ''}</td>
     <td><a class="mono" target="_blank" rel="noopener" href="${EXP}/address/${p.beneficiary}">${short(p.beneficiary)}</a></td></tr>`).join('')
@@ -298,6 +361,7 @@ function draw(s) {
   const key = JSON.stringify([s.policies.map((p) => p.id + p.status), s.reports.map((r) => r.eventId + r.paidCount)]);
   if (key !== lastKey) { lastKey = key; drawMap(s); } // redraw only on change so open popups stay open
   drawTables(s); drawReplay(s);
+  if (window.afterDraw) afterDraw(s);
 }
 
 async function refresh() {
@@ -312,5 +376,7 @@ $('replayBtn').onclick = async () => {
 refresh(); setInterval(refresh, 5000);
 setInterval(() => S && drawReplay(S), 1000);
 </script>
+<script src="/vendor/ethers/ethers.umd.min.js"></script>
+<script src="/app.js"></script>
 </body>
 </html>

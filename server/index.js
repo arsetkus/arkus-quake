@@ -10,7 +10,7 @@ const path = require('path');
 const { ethers } = require('ethers');
 const agent = require('../agent/index');
 const chain = require('../agent/chain');
-const { seedPolicies, readLabels } = require('../scripts/demo');
+const { seedPolicies, readLabels, writeLabels, ensureBalance, DEMO_POLICIES, E } = require('../scripts/demo');
 const usdtJ = require('../build/MockUSDT.json');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -18,6 +18,9 @@ const POLL = agent.cfg.pollSec;
 const REPLAY_COOLDOWN = parseInt(process.env.REPLAY_COOLDOWN_SECONDS || '300', 10);
 const WEB = path.join(__dirname, '..', 'web');
 const EXPLORER = 'https://testnet.bscscan.com';
+// read-only RPC the browser uses before a wallet is connected (never expose RPC_URL: it may carry an API key)
+const PUBLIC_RPC = process.env.PUBLIC_RPC_URL || 'https://bsc-testnet-rpc.publicnode.com';
+const CHAIN = { name: 'BNB Smart Chain Testnet', chainId: 97, explorer: EXPLORER, rpc: PUBLIC_RPC };
 const log = (...a) => console.log(new Date().toISOString().slice(0, 19), ...a);
 
 // ---------------------------------------------------------------- tx serialisation
@@ -58,6 +61,14 @@ async function runReplay() {
     const missing = REPLAY_TARGETS.filter((l) => !activeLabels.has(l)); // replace only what the last demo paid out
     if (missing.length) {
       const token = new ethers.Contract(await pool.asset(), usdtJ.abi, relayer);
+      // public users may have reserved most of the pool: top it up from the testnet faucet first
+      const need = DEMO_POLICIES.filter((p) => missing.includes(p.label)).reduce((s, p) => s + E(p.coverage), 0n);
+      const free = await pool.freeLiquidity();
+      if (free < need) {
+        const topUp = need - free + E(1000);
+        await serial(async () => { await ensureBalance(token, relayer, await pool.getAddress(), topUp); await (await pool.deposit(topUp)).wait(); });
+        log(`topped up pool liquidity by ${ethers.formatEther(topUp)} mUSDT for the demo`);
+      }
       await serial(() => seedPolicies(pool, token, relayer, { only: missing }));
       log('re-seeded West Sumatra policies for the next demo');
     }
@@ -96,9 +107,9 @@ async function buildStatus() {
   if (Date.now() - cache.at < 8000 && cache.body) return cache.body;
   const { pool, index, relayer, provider } = agent.connect();
   await index.sync();
-  const [totalAssets, reserved, cw, threshold, attesterCount, lockUntil, gas] = await Promise.all([
+  const [totalAssets, reserved, cw, threshold, attesterCount, lockUntil, gas, waiting] = await Promise.all([
     pool.totalAssets(), pool.reservedCoverage(), pool.challengeWindow(), pool.threshold(), pool.attesterCount(),
-    pool.withdrawLockedUntil(), provider.getBalance(relayer.address),
+    pool.withdrawLockedUntil(), provider.getBalance(relayer.address), pool.waitingPeriod(),
   ]);
   const labels = readLabels();
   const policies = [...index.policies.values()].map((p) => ({
@@ -117,10 +128,11 @@ async function buildStatus() {
     at: Date.now(),
     body: {
       now: Math.floor(Date.now() / 1000),
-      chain: { name: 'BNB Smart Chain Testnet', chainId: 97, explorer: EXPLORER },
+      chain: CHAIN,
       pool: {
         address: await pool.getAddress(), asset: await pool.asset(), totalAssets: fmt(totalAssets), reserved: fmt(reserved),
         free: fmt(totalAssets > reserved ? totalAssets - reserved : 0n), challengeWindow: Number(cw), threshold: Number(threshold),
+        waitingPeriod: Number(waiting),
         attesterCount: Number(attesterCount), withdrawLockedUntil: Number(lockUntil),
         lpDeposited: fmt(index.lp.deposited),
       },
@@ -145,7 +157,7 @@ async function setupStatus() {
       if (m) env[m[1]] = m[2];
     }
   } catch {}
-  const out = { setup: true, chain: { name: 'BNB Smart Chain Testnet', chainId: 97, explorer: EXPLORER }, relayer: null };
+  const out = { setup: true, chain: CHAIN, relayer: null };
   if (env.RELAYER_KEY) {
     const address = new ethers.Wallet(env.RELAYER_KEY).address;
     let gasBnb = null;
@@ -153,6 +165,44 @@ async function setupStatus() {
     out.relayer = { address, gasBnb };
   }
   return out;
+}
+
+// ---------------------------------------------------------------- policy labels (sponsor-signed)
+// Labels live off-chain (data/labels.json). Only the policy's sponsor may set one, once, proven by
+// signing labelMessage() with the sponsoring wallet.
+const labelMessage = (id, label) => `ARKUS: beri nama polis #${id}: ${label}`;
+const DEMO_LABELS = new Set(DEMO_POLICIES.map((p) => p.label.toLowerCase()));
+
+function readBody(req, limit = 2048) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (c) => { data += c; if (data.length > limit) { reject(new Error('body too large')); req.destroy(); } });
+    req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { reject(new Error('invalid JSON')); } });
+    req.on('error', reject);
+  });
+}
+
+async function setLabel(body) {
+  const id = String(body.id || '');
+  // normalised exactly like the browser does before signing, so the signature still matches
+  const label = String(body.label || '').replace(/\s+/g, ' ').trim();
+  if (!/^\d{1,9}$/.test(id)) return [400, 'id tidak valid'];
+  if (label.length < 3 || label.length > 40) return [400, 'Nama 3 sampai 40 karakter'];
+  if (/[\u0000-\u001f\u007f<>]/.test(label)) return [400, 'Nama tidak boleh berisi < atau >'];
+  if (DEMO_LABELS.has(label.toLowerCase())) return [400, 'Nama itu dipakai polis demo'];
+  const { index } = agent.connect();
+  await index.sync();
+  const p = index.policies.get(id);
+  if (!p) return [404, 'Polis belum terbaca, coba lagi sebentar'];
+  let signer;
+  try { signer = ethers.verifyMessage(labelMessage(id, label), String(body.signature || '')); } catch { return [400, 'Tanda tangan tidak valid'] }
+  if (signer.toLowerCase() !== p.sponsor.toLowerCase()) return [403, 'Hanya sponsor polis yang bisa memberi nama'];
+  const labels = readLabels();
+  if (labels[id]) return [409, 'Polis ini sudah punya nama'];
+  labels[id] = label;
+  writeLabels(labels);
+  cache.at = 0;
+  return [200, { ok: true, id, label }];
 }
 
 // ---------------------------------------------------------------- http
@@ -167,12 +217,16 @@ const server = http.createServer(async (req, res) => {
   try {
     if (SETUP && url.pathname === '/api/status') return send(res, 200, await setupStatus());
     if (SETUP && url.pathname === '/api/health') return send(res, 200, { ok: true, setup: true });
-    if (SETUP && url.pathname === '/api/replay') return send(res, 503, { error: 'Kontrak belum di-deploy' });
+    if (SETUP && url.pathname.startsWith('/api/')) return send(res, 503, { error: 'Kontrak belum di-deploy' });
     if (url.pathname === '/api/status' && req.method === 'GET') {
       const body = await buildStatus();
       return send(res, 200, { ...body, replay: { ...replay, cooldownSeconds: REPLAY_COOLDOWN, nextAllowedAt: replay.lastAt + REPLAY_COOLDOWN * 1000 } });
     }
     if (url.pathname === '/api/health') return send(res, 200, { ok: true, agent: agentState });
+    if (url.pathname === '/api/label' && req.method === 'POST') {
+      const [code, out] = await setLabel(await readBody(req));
+      return send(res, code, typeof out === 'string' ? { error: out } : out);
+    }
     if (url.pathname === '/api/replay' && req.method === 'POST') {
       if (replay.running) return send(res, 409, { error: 'Simulasi sedang berjalan' });
       const wait = replay.lastAt + REPLAY_COOLDOWN * 1000 - Date.now();

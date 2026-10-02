@@ -21,7 +21,7 @@ scripts/demo.js                    polis demo warga Sumbar
 scripts/verify.js                  verifikasi source kontrak di BscScan (npm run verify)
 deployments/bsc-testnet.json       alamat kontrak yang sedang live
 server/index.js                    1 proses: oracle loop + dashboard + API + replay demo
-web/index.html                     dashboard publik (arkuss.app)
+web/index.html + web/app.js        dashboard publik (arkuss.app): beli polis, cek polis, LP via wallet
 deploy/install.sh                  installer VPS Ubuntu: Node 20, Caddy (HTTPS), systemd, ufw
 ```
 

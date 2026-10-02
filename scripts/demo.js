@@ -55,4 +55,4 @@ async function seedPolicies(pool, token, signer, { only } = {}) {
   return ids;
 }
 
-module.exports = { DEMO_POLICIES, seedPolicies, ensureBalance, readLabels, E };
+module.exports = { DEMO_POLICIES, seedPolicies, ensureBalance, readLabels, writeLabels, E };

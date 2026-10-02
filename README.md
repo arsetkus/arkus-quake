@@ -95,10 +95,18 @@ Demo pool: 2-of-3 attesters, 180 s challenge window, simulated replays enabled. 
 
 Example run: replay of the 2009 Padang M7.6 earthquake, [report tx](https://testnet.bscscan.com/tx/0xb9c80594fb9342acf2804700435d6395c06ba1df63abc8f027d6b7c00a0e0032) → [payout tx](https://testnet.bscscan.com/tx/0xc1a721d21e1b38e96a3fee2d6b37289b57ad96975011717979416e746f05a871). Padang, Pariaman and Painan were paid 2,750 mUSDT in total; Bukittinggi and Mentawai (just outside their radius) and Palu (other island) were not.
 
-## Try the demo
+## Try it
 
-1. Open [arkuss.app](https://arkuss.app): map of active policies, real quakes reported by the oracle, pool balances.
-2. Click **Simulasikan gempa M7.6**: the oracle replays Padang 2009, attesters sign, the report goes on-chain, the challenge window counts down, and the keeper pays the eligible residents. Every step links to BscScan.
+Open [arkuss.app](https://arkuss.app): map of active policies, real quakes reported by the oracle, pool balances. No account or sign-up: your wallet is your identity, and beneficiaries only need an address.
+
+| Who | What they do on the dashboard |
+|---|---|
+| **Sponsor** (local government, CSR, diaspora) | **Beli polis**: connect a wallet (MetaMask, Trust, Binance Wallet; switches to BSC Testnet automatically), click the map to choose the protected location, set radius, magnitude threshold, coverage and duration. The premium is quoted live by the contract (`quotePremium`). One click gets test mUSDT from the faucet if needed, approves, and buys. An optional policy name is stored off-chain, proven by a signature from the sponsor wallet. |
+| **Resident** | **Cek polis**: paste an address to see its policies, status, payouts and mUSDT balance. |
+| **Liquidity provider** | **Jadi LP**: deposit or withdraw mUSDT, see pool share, free liquidity and the post-quake withdrawal lock. |
+| **Anyone** | **Simulasikan gempa M7.6**: the oracle replays Padang 2009, attesters sign, the report goes on-chain, the challenge window counts down, and the keeper pays every eligible policy, including ones you bought yourself. Every step links to BscScan. |
+
+You need a little test BNB for gas ([BNB testnet faucet](https://www.bnbchain.org/en/testnet-faucet)); test mUSDT is minted from the dashboard.
 
 ## Run locally
 
@@ -130,7 +138,7 @@ compile.js / test.js               compiler + 25 contract tests
 agent/                             oracle agent: sources, cross-check, signing, keeper, CLI, 11 tests
 scripts/                           deploy, demo policies, BscScan verification
 server/index.js                    single process: oracle loop + public dashboard + JSON API + replay
-web/index.html                     dashboard (Leaflet map, no build step)
+web/index.html + web/app.js        dashboard + wallet flows: buy policy, check policy, LP (no build step)
 deploy/                            VPS installer + Windows upload helper
 deployments/bsc-testnet.json       live contract addresses
 ```
