@@ -360,7 +360,8 @@ function drawSetup(s) {
 // live view: drop simulated reports and the policies they paid, so every number on '/' is real
 function liveView(s) {
   const sim = new Set(s.reports.filter((r) => r.simulated).map((r) => r.eventId));
-  const policies = s.policies.filter((p) => !(p.status === 'paid' && sim.has(p.paidEvent)));
+  // a payout counts as real only when its report is known and not simulated
+  const policies = s.policies.filter((p) => !(p.status === 'paid' && (!p.paidEvent || sim.has(p.paidEvent))));
   const paid = policies.filter((p) => p.status === 'paid').reduce((t, p) => t + p.coverage, 0);
   return { ...s, policies, reports: s.reports.filter((r) => !r.simulated), totals: { ...s.totals, paid, policies: policies.length } };
 }

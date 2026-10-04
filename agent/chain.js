@@ -88,35 +88,58 @@ const toJson = (v) => JSON.stringify(v, (k, x) => (typeof x === 'bigint' ? { $n:
 const fromJson = (s) => JSON.parse(s, (k, x) => (x && typeof x === 'object' && Object.keys(x).length === 1 && typeof x.$n === 'string' ? BigInt(x.$n) : x));
 
 /**
+ * Logs for a block range from a JSON-RPC endpoint that still keeps old logs (an archive / history
+ * node, e.g. a NodeReal key). Same shape as etherscanLogs.
+ */
+function rpcLogs(url, { chainId = 97, step = 2000 } = {}) {
+  const p = new ethers.JsonRpcProvider(url, chainId, { staticNetwork: true });
+  return async (address, fromBlock, toBlock) => {
+    const out = [];
+    for (let from = fromBlock; from <= toBlock; from += step) {
+      const logs = await p.getLogs({ address, fromBlock: from, toBlock: Math.min(toBlock, from + step - 1) });
+      out.push(...logs.map((l) => ({ topics: [...l.topics], data: l.data, blockNumber: l.blockNumber, transactionHash: l.transactionHash, logIndex: l.index })));
+    }
+    return out;
+  };
+}
+
+/**
  * Incremental index of every pool log. Scans only new blocks on each sync(), so a long-running
  * agent / web server does not re-scan the whole chain (BSC testnet makes ~1 block per second).
- * With `file` the index survives restarts; with `explorer` a fresh index backfills history the
- * RPC no longer serves (the keeper relies on this index to find policies to pay).
+ *
+ * Public BSC testnet RPCs keep only ~2 days of logs, and the keeper relies on this index to find the
+ * policies to pay, so a fresh index must not depend on old logs:
+ *   - `file`: the index is saved after every sync and a restart resumes from it;
+ *   - `explorer`: a history source (archive RPC or explorer API) backfills a fresh index exactly;
+ *   - otherwise the index is rebuilt from contract state (policies from storage, reports from the
+ *     agent's snapshots in `snapshots`), marked incomplete, and the history source is retried later.
  */
 class PoolIndex {
-  constructor(pool, { fromBlock = 0, step = 4000, file = null, explorer = null, log = () => {} } = {}) {
+  constructor(pool, { fromBlock = 0, step = 4000, file = null, explorer = null, snapshots = null, log = () => {} } = {}) {
     this.pool = pool;
     this.provider = pool.runner.provider;
+    this.fromBlock = fromBlock;
     this.next = fromBlock;
     this.step = step;
     this.file = file;
     this.explorer = explorer;
+    this.snapshots = snapshots;
     this.log = log;
     this.policies = new Map(); // id -> policy
     this.reports = new Map();  // eventId -> report
     this.lp = { deposited: 0n, withdrawn: 0n };
     this.blockTimes = new Map();
+    this.complete = true;      // false = rebuilt from state, logs before `next` were never seen
+    this.historyTried = false; // try the history source once per process
     this.restored = file ? this.load() : false;
   }
 
   load() {
     try {
       const j = fromJson(fs.readFileSync(this.file, 'utf8'));
-      if (String(j.pool).toLowerCase() !== String(this.pool.target).toLowerCase()) return false;
-      this.next = j.next;
-      this.policies = new Map(j.policies);
-      this.reports = new Map(j.reports);
-      this.lp = j.lp;
+      // files from before the `complete` flag may come from a pruned RPC scan: rebuild those
+      if (String(j.pool).toLowerCase() !== String(this.pool.target).toLowerCase() || typeof j.complete !== 'boolean') return false;
+      Object.assign(this, { next: j.next, complete: j.complete, policies: new Map(j.policies), reports: new Map(j.reports), lp: j.lp });
       return true;
     } catch { return false; }
   }
@@ -124,8 +147,15 @@ class PoolIndex {
   save() {
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
     const tmp = this.file + '.tmp';
-    fs.writeFileSync(tmp, toJson({ pool: this.pool.target, next: this.next, policies: [...this.policies], reports: [...this.reports], lp: this.lp }));
+    fs.writeFileSync(tmp, toJson({ pool: this.pool.target, next: this.next, complete: this.complete,
+      policies: [...this.policies], reports: [...this.reports], lp: this.lp }));
     fs.renameSync(tmp, this.file);
+  }
+
+  reset() {
+    this.policies = new Map();
+    this.reports = new Map();
+    this.lp = { deposited: 0n, withdrawn: 0n };
   }
 
   async head() {
@@ -143,31 +173,92 @@ class PoolIndex {
     return this._inflight;
   }
 
+  /** Exact history from the history source; false if there is none or it failed. */
+  async backfill(address, head) {
+    if (!this.explorer || this.historyTried || this.fromBlock >= head - 200) return false;
+    this.historyTried = true;
+    const to = head - 200; // explorers lag a few blocks; the RPC covers the rest
+    let logs;
+    try { logs = await this.explorer(address, this.fromBlock, to); } catch (e) {
+      this.log(`index: WARNING history backfill failed (${e.message})`);
+      return false;
+    }
+    this.reset();
+    for (const l of logs) { if (l.timeStamp) this.blockTimes.set(l.blockNumber, l.timeStamp); await this.apply(l); }
+    this.next = to + 1;
+    this.complete = true;
+    this.log(`index: backfilled ${logs.length} logs (blocks ${this.fromBlock}..${to}) from the history source`);
+    return true;
+  }
+
+  /**
+   * No log history: rebuild from contract state as of `head`. Policies come from storage, reports
+   * from the agent's snapshots (checked against events()), and which report paid each closed policy
+   * is re-derived with the contract's own rules. Payout tx hashes and premiums are unknown.
+   */
+  async rebuildFromState(head) {
+    this.reset();
+    const [n, waiting, cw, grace, nowTs] = await Promise.all([this.pool.nextPolicyId(), this.pool.waitingPeriod(), this.pool.challengeWindow(),
+      this.pool.SETTLEMENT_GRACE(), this.provider.getBlock(head).then((b) => b.timestamp)]);
+    const files = this.snapshots && fs.existsSync(this.snapshots) ? fs.readdirSync(this.snapshots).filter((f) => /^0x[0-9a-fA-F]{64}\.json$/.test(f)) : [];
+    for (const f of files) {
+      let snap;
+      try { snap = JSON.parse(fs.readFileSync(path.join(this.snapshots, f), 'utf8')); } catch { continue; }
+      const eventId = f.slice(0, -5).toLowerCase();
+      const e = await this.pool.events(eventId);
+      if (!e.exists) continue;
+      this.reports.set(eventId, { eventId, magX10: Number(e.magX10), latE4: Number(e.latE4), lonE4: Number(e.lonE4), occurredAt: Number(e.occurredAt),
+        sourcesHash: (snap.report && snap.report.sourcesHash) || null, simulated: e.simulated, reportedAt: Number(e.reportedAt), vetoed: e.vetoed,
+        paidCount: 0, paidAmount: 0n, block: null, tx: snap.tx || null });
+    }
+    const byTime = [...this.reports.values()].sort((a, b) => a.reportedAt - b.reportedAt);
+    for (let id = 1; id < Number(n); id++) {
+      const p = await this.pool.policies(id);
+      const pol = { id: String(id), sponsor: p.sponsor, beneficiary: p.beneficiary, latE4: Number(p.latE4), lonE4: Number(p.lonE4),
+        radiusKm: Number(p.radiusKm), minMagX10: Number(p.minMagX10), coverage: p.coverage, premium: 0n, end: Number(p.end), status: 'active',
+        boughtAt: Number(p.waitingUntil) - Number(waiting), block: null, tx: null };
+      if (p.closed) {
+        let by = null;
+        for (const r of byTime) {
+          if (r.vetoed || r.magX10 < pol.minMagX10 || r.occurredAt < Number(p.waitingUntil) || r.occurredAt > pol.end || r.reportedAt + Number(cw) > nowTs) continue;
+          if (await this.pool.withinRadius(p.latE4, p.lonE4, r.latE4, r.lonE4, p.radiusKm)) { by = r; break; }
+        }
+        if (by) {
+          Object.assign(pol, { status: 'paid', paidEvent: by.eventId, paidTx: null, paidAt: null });
+          by.paidCount++; by.paidAmount += p.coverage;
+        } else if (nowTs < pol.end + Number(grace)) {
+          // release is only possible after end + grace, so this was a payout by a report we have no snapshot for
+          Object.assign(pol, { status: 'paid', paidEvent: null, paidTx: null, paidAt: null });
+        } else pol.status = 'expired';
+      }
+      this.policies.set(pol.id, pol);
+    }
+    this.next = head + 1;
+    this.complete = false;
+    this.log(`index: rebuilt from contract state (${this.policies.size} policies, ${this.reports.size} reports from snapshots); log history unavailable`);
+  }
+
   async _sync() {
     const head = await this.head();
     const address = await this.pool.getAddress();
     const start = this.next;
-    // fresh index: history from the explorer, stopping a little short of head (explorers lag a few blocks)
-    if (this.explorer && !this.restored && this.next < head - 200) {
-      const to = head - 200;
-      let logs = null;
-      try { logs = await this.explorer(address, this.next, to); } catch (e) {
-        this.log(`index: WARNING explorer backfill failed (${e.message}); falling back to the RPC, older logs may be missing`);
+    if (!this.restored || !this.complete) {
+      const exact = await this.backfill(address, head);
+      if (!exact && !this.restored) {
+        // the RPC alone can still be complete when the pool is younger than its log retention
+        let rpcOk = false;
+        try { rpcOk = (await this.provider.getLogs({ address, fromBlock: this.fromBlock, toBlock: this.fromBlock })).length > 0; } catch {}
+        if (!rpcOk && this.file) await this.rebuildFromState(head);
       }
-      if (logs) {
-        for (const l of logs) { if (l.timeStamp) this.blockTimes.set(l.blockNumber, l.timeStamp); await this.apply(l); }
-        this.log(`index: backfilled ${logs.length} logs (blocks ${this.next}..${to}) from the explorer`);
-        this.next = to + 1;
-      }
+      this.restored = true;
     }
-    this.restored = true;
     while (this.next <= head) {
       const to = Math.min(head, this.next + this.step - 1);
       const logs = await this.provider.getLogs({ address, fromBlock: this.next, toBlock: to });
       for (const l of logs) await this.apply(l);
       this.next = to + 1;
     }
-    if (this.file && this.next !== start) this.save();
+    if (this.file && (this.next !== start || !this.restoredSaved)) { this.save(); this.restoredSaved = true; }
     return this;
   }
 
@@ -245,4 +336,4 @@ async function runKeeper(pool, { fromBlock = 0, index, batchSize = 50, log = con
   return { reports: idx.reports.size, policies: idx.policies.size, paid: totalPaid };
 }
 
-module.exports = { PoolIndex, etherscanLogs, REPORT_TYPES, poolAt, domainFor, signReport, sortSignatures, isReported, submitReport, runKeeper, queryChunked };
+module.exports = { PoolIndex, etherscanLogs, rpcLogs, REPORT_TYPES, poolAt, domainFor, signReport, sortSignatures, isReported, submitReport, runKeeper, queryChunked };

@@ -47,13 +47,15 @@ function connect() {
   relayer.address = wallet.address;
   const attesters = cfg.attesterKeys.map((k) => new ethers.Wallet(k));
   const pool = chain.poolAt(cfg.pool, relayer);
-  // the index is saved to disk (restarts resume where they left off); a fresh one backfills from the explorer
-  const apiKey = env('BSCSCAN_API_KEY');
-  if (!apiKey) log('note: BSCSCAN_API_KEY not set; a fresh index relies on the RPC, which keeps only recent logs');
+  // The index is saved to disk (restarts resume where they left off). A fresh one takes old logs from
+  // a history source if configured (archive RPC, or a paid Etherscan plan; the free plan has no BSC
+  // testnet), otherwise it is rebuilt from contract state + the snapshots in agent/data.
+  const chainId = parseInt(env('CHAIN_ID', '97'), 10);
+  const historyRpc = env('HISTORY_RPC_URL'), apiKey = env('BSCSCAN_API_KEY');
   const index = new chain.PoolIndex(pool, {
-    fromBlock: cfg.fromBlock, log,
+    fromBlock: cfg.fromBlock, log, snapshots: dataDir,
     file: path.join(__dirname, '..', 'data', `index-${cfg.pool.toLowerCase()}.json`),
-    explorer: apiKey ? chain.etherscanLogs({ apiKey, chainId: parseInt(env('CHAIN_ID', '97'), 10) }) : null,
+    explorer: historyRpc ? chain.rpcLogs(historyRpc, { chainId }) : apiKey ? chain.etherscanLogs({ apiKey, chainId }) : null,
   });
   conn = { provider, relayer, attesters, pool, index };
   return conn;

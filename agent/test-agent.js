@@ -127,9 +127,18 @@ const usgsPayload = { features: [
   };
   for (let i = 0; i < 205; i++) await provider.send('evm_mine', []); // explorer covers up to head - 200
   const head = await provider.getBlockNumber();
-  const prunedRpc = { getLogs: async (f) => (f.fromBlock < head - 200 ? [] : provider.getLogs(f)), getBlock: (n) => provider.getBlock(n), send: (m, p) => provider.send(m, p) };
+  const prunedRpc = new Proxy(provider, { get: (t, k) => (k === 'getLogs' ? async (f) => (Number(f.fromBlock) < head - 200 ? [] : t.getLogs(f))
+    : typeof t[k] === 'function' ? t[k].bind(t) : t[k]) });
   const prunedPool = chain.poolAt(pa, keeper); Object.defineProperty(prunedPool.runner, 'provider', { value: prunedRpc, configurable: true });
-  const file = require('path').join(require('os').tmpdir(), `arkus-index-${Date.now()}.json`);
+  const fsx = require('fs'), os = require('os'), pathx = require('path');
+  const tmp = fsx.mkdtempSync(pathx.join(os.tmpdir(), 'arkus-index-'));
+  const file = pathx.join(tmp, 'index.json'), snapshots = pathx.join(tmp, 'snapshots');
+  // the agent saves one snapshot file per report it submitted
+  fsx.mkdirSync(snapshots);
+  const liveReport = live.reports.get(honest.eventId);
+  fsx.writeFileSync(pathx.join(snapshots, `${honest.eventId}.json`), JSON.stringify({ report: { ...honest }, tx: liveReport.tx }));
+  const stateView = (ix) => JSON.stringify([[...ix.policies.values()].map((p) => [p.id, p.status, p.paidEvent || null, p.beneficiary, String(p.coverage)]).sort(),
+    [...ix.reports.values()].map((r) => [r.eventId, r.paidCount, String(r.paidAmount), r.tx])]);
   try {
     const blind = await new chain.PoolIndex(prunedPool).sync();
     assert.equal(blind.policies.size, 0); // what happened on the VPS after a restart
@@ -140,9 +149,26 @@ const usgsPayload = { features: [
     assert.equal(restarted.restored, true);
     assert.equal(view(await restarted.sync()), view(live));
     ok('restart resumes from the saved index file (no history scan, nothing lost)');
+
+    // no history source at all (free Etherscan plans do not cover BSC testnet)
+    fsx.unlinkSync(file);
+    const failing = async () => ({ json: async () => ({ status: '0', message: 'NOTOK', result: 'Free API access is not supported for this chain.' }) });
+    const fetchOk = global.fetch; global.fetch = failing;
+    const rebuilt = await new chain.PoolIndex(prunedPool, { file, snapshots, explorer: chain.etherscanLogs({ apiKey: 'free' }) }).sync();
+    assert.equal(stateView(rebuilt), stateView(live));
+    assert.equal(rebuilt.complete, false);
+    ok('without log history the index is rebuilt from contract state: same policies, payouts and reports');
+    // a later restart with a working history source upgrades the incomplete index to the exact one
+    global.fetch = fetchOk;
+    const upgraded = new chain.PoolIndex(prunedPool, { file, snapshots, explorer: chain.etherscanLogs({ apiKey: 'test' }) });
+    assert.equal(upgraded.restored, true);
+    await upgraded.sync();
+    assert.equal(upgraded.complete, true);
+    assert.equal(view(upgraded), view(live));
+    ok('incomplete index is backfilled exactly once a history source works');
   } finally {
     global.fetch = realFetch;
-    try { require('fs').unlinkSync(file); } catch {}
+    fsx.rmSync(tmp, { recursive: true, force: true });
   }
 
   console.log(`\nALL ${passed} AGENT CHECKS PASSED`);
