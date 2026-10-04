@@ -111,6 +111,40 @@ const usgsPayload = { features: [
   assert.equal(k.paid, 0);
   ok('keeper re-run is idempotent (no double payout)');
 
+  console.log('\n[index survives restarts and RPC log pruning]');
+  const live = await new chain.PoolIndex(pool).sync();
+  const view = (ix) => JSON.stringify([[...ix.policies.values()].map((p) => [p.id, p.status, p.paidEvent || null, p.beneficiary]).sort(),
+    [...ix.reports.values()].map((r) => [r.eventId, r.paidCount, String(r.paidAmount)]), String(ix.lp.deposited)]);
+  // the explorer answers in Etherscan's format (hex strings); the RPC "forgets" everything before head
+  const allLogs = await provider.getLogs({ address: pa, fromBlock: 0, toBlock: 'latest' });
+  const realFetch = global.fetch;
+  global.fetch = async (url) => {
+    const q = new URL(url).searchParams;
+    const page = allLogs.filter((l) => l.blockNumber >= +q.get('fromBlock') && l.blockNumber <= +q.get('toBlock'));
+    const result = await Promise.all(page.map(async (l) => ({ address: l.address, topics: l.topics, data: l.data, blockNumber: '0x' + l.blockNumber.toString(16),
+      timeStamp: '0x' + (await provider.getBlock(l.blockNumber)).timestamp.toString(16), transactionHash: l.transactionHash, logIndex: '0x' + l.index.toString(16) })));
+    return { json: async () => (result.length ? { status: '1', message: 'OK', result } : { status: '0', message: 'No records found', result: [] }) };
+  };
+  for (let i = 0; i < 205; i++) await provider.send('evm_mine', []); // explorer covers up to head - 200
+  const head = await provider.getBlockNumber();
+  const prunedRpc = { getLogs: async (f) => (f.fromBlock < head - 200 ? [] : provider.getLogs(f)), getBlock: (n) => provider.getBlock(n), send: (m, p) => provider.send(m, p) };
+  const prunedPool = chain.poolAt(pa, keeper); Object.defineProperty(prunedPool.runner, 'provider', { value: prunedRpc, configurable: true });
+  const file = require('path').join(require('os').tmpdir(), `arkus-index-${Date.now()}.json`);
+  try {
+    const blind = await new chain.PoolIndex(prunedPool).sync();
+    assert.equal(blind.policies.size, 0); // what happened on the VPS after a restart
+    const fresh = await new chain.PoolIndex(prunedPool, { file, explorer: chain.etherscanLogs({ apiKey: 'test' }) }).sync();
+    assert.equal(view(fresh), view(live));
+    ok('fresh index backfills history from the explorer when the RPC pruned old logs');
+    const restarted = new chain.PoolIndex(prunedPool, { file });
+    assert.equal(restarted.restored, true);
+    assert.equal(view(await restarted.sync()), view(live));
+    ok('restart resumes from the saved index file (no history scan, nothing lost)');
+  } finally {
+    global.fetch = realFetch;
+    try { require('fs').unlinkSync(file); } catch {}
+  }
+
   console.log(`\nALL ${passed} AGENT CHECKS PASSED`);
   process.exit(0);
 })().catch((e) => { console.error('\nFAILED:', e.stack || e.message); process.exit(1); });

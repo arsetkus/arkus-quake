@@ -1,5 +1,7 @@
 // On-chain side: EIP-712 signing, report relay, and the keeper that pays eligible policies.
 'use strict';
+const fs = require('fs');
+const path = require('path');
 const { ethers } = require('ethers');
 const { haversineKm } = require('./match');
 const poolArtifact = require('../build/ParametricQuakePool.json');
@@ -57,19 +59,73 @@ async function queryChunked(contract, filter, fromBlock, toBlock, step = 4000) {
 }
 
 /**
+ * Logs from the block explorer (Etherscan API v2, which serves BscScan). Public BSC testnet RPCs only
+ * keep about two days of logs, so history older than that has to come from here.
+ * Returns (address, fromBlock, toBlock) => logs sorted by block and log index.
+ */
+function etherscanLogs({ apiKey, chainId = 97, url = 'https://api.etherscan.io/v2/api' }) {
+  const hex = (v) => (v && v !== '0x' ? Number(v) : 0);
+  return async (address, fromBlock, toBlock) => {
+    const out = [];
+    for (let page = 1; ; page++) {
+      const q = new URLSearchParams({ chainid: String(chainId), module: 'logs', action: 'getLogs', address, fromBlock: String(fromBlock),
+        toBlock: String(toBlock), page: String(page), offset: '1000', apikey: apiKey });
+      const j = await (await fetch(`${url}?${q}`)).json();
+      if (j.status !== '1') {
+        if (/no records/i.test(j.message || '')) break;
+        throw new Error('explorer logs: ' + (typeof j.result === 'string' ? j.result : j.message));
+      }
+      out.push(...j.result.map((l) => ({ topics: l.topics.filter(Boolean), data: l.data, blockNumber: hex(l.blockNumber),
+        transactionHash: l.transactionHash, logIndex: hex(l.logIndex), timeStamp: hex(l.timeStamp) })));
+      if (j.result.length < 1000) break;
+    }
+    return out.sort((a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
+  };
+}
+
+// JSON with bigints (coverage, premiums, LP totals)
+const toJson = (v) => JSON.stringify(v, (k, x) => (typeof x === 'bigint' ? { $n: x.toString() } : x));
+const fromJson = (s) => JSON.parse(s, (k, x) => (x && typeof x === 'object' && Object.keys(x).length === 1 && typeof x.$n === 'string' ? BigInt(x.$n) : x));
+
+/**
  * Incremental index of every pool log. Scans only new blocks on each sync(), so a long-running
  * agent / web server does not re-scan the whole chain (BSC testnet makes ~1 block per second).
+ * With `file` the index survives restarts; with `explorer` a fresh index backfills history the
+ * RPC no longer serves (the keeper relies on this index to find policies to pay).
  */
 class PoolIndex {
-  constructor(pool, { fromBlock = 0, step = 4000 } = {}) {
+  constructor(pool, { fromBlock = 0, step = 4000, file = null, explorer = null, log = () => {} } = {}) {
     this.pool = pool;
     this.provider = pool.runner.provider;
     this.next = fromBlock;
     this.step = step;
+    this.file = file;
+    this.explorer = explorer;
+    this.log = log;
     this.policies = new Map(); // id -> policy
     this.reports = new Map();  // eventId -> report
     this.lp = { deposited: 0n, withdrawn: 0n };
     this.blockTimes = new Map();
+    this.restored = file ? this.load() : false;
+  }
+
+  load() {
+    try {
+      const j = fromJson(fs.readFileSync(this.file, 'utf8'));
+      if (String(j.pool).toLowerCase() !== String(this.pool.target).toLowerCase()) return false;
+      this.next = j.next;
+      this.policies = new Map(j.policies);
+      this.reports = new Map(j.reports);
+      this.lp = j.lp;
+      return true;
+    } catch { return false; }
+  }
+
+  save() {
+    fs.mkdirSync(path.dirname(this.file), { recursive: true });
+    const tmp = this.file + '.tmp';
+    fs.writeFileSync(tmp, toJson({ pool: this.pool.target, next: this.next, policies: [...this.policies], reports: [...this.reports], lp: this.lp }));
+    fs.renameSync(tmp, this.file);
   }
 
   async head() {
@@ -90,12 +146,28 @@ class PoolIndex {
   async _sync() {
     const head = await this.head();
     const address = await this.pool.getAddress();
+    const start = this.next;
+    // fresh index: history from the explorer, stopping a little short of head (explorers lag a few blocks)
+    if (this.explorer && !this.restored && this.next < head - 200) {
+      const to = head - 200;
+      let logs = null;
+      try { logs = await this.explorer(address, this.next, to); } catch (e) {
+        this.log(`index: WARNING explorer backfill failed (${e.message}); falling back to the RPC, older logs may be missing`);
+      }
+      if (logs) {
+        for (const l of logs) { if (l.timeStamp) this.blockTimes.set(l.blockNumber, l.timeStamp); await this.apply(l); }
+        this.log(`index: backfilled ${logs.length} logs (blocks ${this.next}..${to}) from the explorer`);
+        this.next = to + 1;
+      }
+    }
+    this.restored = true;
     while (this.next <= head) {
       const to = Math.min(head, this.next + this.step - 1);
       const logs = await this.provider.getLogs({ address, fromBlock: this.next, toBlock: to });
       for (const l of logs) await this.apply(l);
       this.next = to + 1;
     }
+    if (this.file && this.next !== start) this.save();
     return this;
   }
 
@@ -173,4 +245,4 @@ async function runKeeper(pool, { fromBlock = 0, index, batchSize = 50, log = con
   return { reports: idx.reports.size, policies: idx.policies.size, paid: totalPaid };
 }
 
-module.exports = { PoolIndex, REPORT_TYPES, poolAt, domainFor, signReport, sortSignatures, isReported, submitReport, runKeeper, queryChunked };
+module.exports = { PoolIndex, etherscanLogs, REPORT_TYPES, poolAt, domainFor, signReport, sortSignatures, isReported, submitReport, runKeeper, queryChunked };

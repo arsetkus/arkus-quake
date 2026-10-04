@@ -47,7 +47,15 @@ function connect() {
   relayer.address = wallet.address;
   const attesters = cfg.attesterKeys.map((k) => new ethers.Wallet(k));
   const pool = chain.poolAt(cfg.pool, relayer);
-  conn = { provider, relayer, attesters, pool, index: new chain.PoolIndex(pool, { fromBlock: cfg.fromBlock }) };
+  // the index is saved to disk (restarts resume where they left off); a fresh one backfills from the explorer
+  const apiKey = env('BSCSCAN_API_KEY');
+  if (!apiKey) log('note: BSCSCAN_API_KEY not set; a fresh index relies on the RPC, which keeps only recent logs');
+  const index = new chain.PoolIndex(pool, {
+    fromBlock: cfg.fromBlock, log,
+    file: path.join(__dirname, '..', 'data', `index-${cfg.pool.toLowerCase()}.json`),
+    explorer: apiKey ? chain.etherscanLogs({ apiKey, chainId: parseInt(env('CHAIN_ID', '97'), 10) }) : null,
+  });
+  conn = { provider, relayer, attesters, pool, index };
   return conn;
 }
 
