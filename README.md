@@ -114,7 +114,7 @@ Requires Node.js ≥ 18.
 
 ```bash
 npm install
-npm test                 # compile + 25 contract tests + 11 agent tests (local chain, no keys needed)
+npm test                 # compile + 25 contract tests + 13 agent tests (local chain, no keys needed)
 npm run agent:dry        # live BMKG + USGS cross-check, shows what WOULD be reported
 ```
 
@@ -135,7 +135,7 @@ npm run verify           # BscScan verification files (+ API submit if BSCSCAN_A
 contracts/ParametricQuakePool.sol  pool, policies, EIP-712 N-of-M oracle reports, claims
 contracts/MockUSDT.sol             testnet stablecoin with faucet
 compile.js / test.js               compiler + 25 contract tests
-agent/                             oracle agent: sources, cross-check, signing, keeper, CLI, 11 tests
+agent/                             oracle agent: sources, cross-check, signing, keeper, CLI, 13 tests
 scripts/                           deploy, demo policies, BscScan verification
 server/index.js                    single process: oracle loop + public dashboard + JSON API + replay
 web/index.html + web/app.js        dashboard + wallet flows: buy policy, check policy, LP (no build step)

@@ -15,7 +15,7 @@ agent/match.js                     aturan cross-check, bikin laporan, verifikasi
 agent/chain.js                     tanda tangan EIP-712, submit, keeper claimBatch
 agent/index.js                     CLI agent
 agent/fixtures/padang-2009.json    data replay demo
-agent/test-agent.js                11 test agent (unit + end-to-end)
+agent/test-agent.js                13 test agent (unit + end-to-end + indeks)
 scripts/deploy.js                  deploy BSC testnet (idempotent): generate key, MockUSDT, pool, LP, polis demo
 scripts/demo.js                    polis demo warga Sumbar
 scripts/verify.js                  verifikasi source kontrak di BscScan (npm run verify)
@@ -39,7 +39,7 @@ Log: `journalctl -u arkus-quake -f`. Cloudflare: SSL/TLS mode **Full (strict)**.
 
 ```
 npm install
-npm test                 # compile + 25 test kontrak + 11 test agent
+npm test                 # compile + 25 test kontrak + 13 test agent
 cp .env.example .env     # isi POOL_ADDRESS, RELAYER_KEY, ATTESTER_KEYS
 npm run agent:dry        # cek BMKG+USGS live, tampilkan gempa yang AKAN dilaporkan (tanpa key)
 npm run agent:watch      # loop: cross-check -> attester tanda tangan -> submit -> keeper bayar
