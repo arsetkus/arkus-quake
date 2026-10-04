@@ -250,7 +250,7 @@ body:not(.demo) #replayCard,body:not(.demo) #demoBanner{display:none} body.demo 
     <div class="card">
       <h2>Laporan gempa on-chain <span class="sp" id="rCount"></span></h2>
       <div class="tbl"><table>
-        <thead><tr><th>Waktu lapor (WIB)</th><th class="num">Magnitudo</th><th>Episentrum</th><th>Jenis</th><th class="num">Polis dibayar</th><th>Transaksi</th></tr></thead>
+        <thead><tr><th>Waktu lapor (WIB)</th><th class="num">Magnitudo</th><th>Lokasi</th><th>Episentrum</th><th class="num">Polis dibayar</th><th>Transaksi</th></tr></thead>
         <tbody id="rBody"></tbody>
       </table></div>
     </div>
@@ -305,7 +305,7 @@ function drawMap(s) {
   }
   s.reports.forEach((r, i) => {
     L.circleMarker([r.lat, r.lon], { radius: 4 + (r.mag - 4) * 3, color: css('--quake'), weight: 2, fillOpacity: i === 0 ? .55 : .25 })
-      .bindPopup(`<b>M${r.mag.toFixed(1)}</b> ${r.simulated ? '(simulasi)' : ''}<br>${r.lat.toFixed(2)}, ${r.lon.toFixed(2)}<br>${r.paidCount} polis dibayar<br><a target="_blank" rel="noopener" href="${EXP}/tx/${r.tx}">lihat transaksi</a>`)
+      .bindPopup(`<b>M${r.mag.toFixed(1)}</b> ${r.simulated ? '(simulasi)' : ''}<br>${r.place ? esc(r.place) + '<br>' : ''}${r.lat.toFixed(2)}, ${r.lon.toFixed(2)}<br>${r.paidCount} polis dibayar<br><a target="_blank" rel="noopener" href="${EXP}/tx/${r.tx}">lihat transaksi</a>`)
       .addTo(layer);
   });
 }
@@ -314,8 +314,8 @@ function drawTables(s) {
   $('rCount').textContent = s.reports.length + ' laporan';
   $('rBody').innerHTML = s.reports.length ? s.reports.map((r) => `<tr>
     <td>${tfmt(r.reportedAt)}</td><td class="num"><b>${r.mag.toFixed(1)}</b></td>
+    <td>${r.place ? esc(r.place) : '<span class="note">–</span>'}${r.simulated ? ' <span class="tag sim">simulasi</span>' : ''}${r.vetoed ? ' <span class="tag veto">diveto</span>' : ''}</td>
     <td class="mono">${r.lat.toFixed(2)}, ${r.lon.toFixed(2)}</td>
-    <td>${r.vetoed ? '<span class="tag veto">diveto</span>' : r.simulated ? '<span class="tag sim">simulasi</span>' : '<span class="tag real">gempa nyata</span>'}</td>
     <td class="num">${r.paidCount} · ${nf.format(r.paidAmount)} mUSDT</td>
     <td><a class="mono" target="_blank" rel="noopener" href="${EXP}/tx/${r.tx}">${short(r.tx)}</a></td></tr>`).join('')
     : '<tr><td colspan="6" class="empty">Belum ada gempa yang memenuhi syarat dilaporkan. Oracle terus memantau BMKG dan USGS.</td></tr>';
@@ -383,7 +383,7 @@ function draw(full) {
   $('aCw').textContent = s.pool.challengeWindow < 120 ? s.pool.challengeWindow + ' detik' : Math.round(s.pool.challengeWindow / 60) + ' menit';
   $('aGas').textContent = s.relayer.gasBnb.toFixed(4) + ' tBNB';
   $('agentErr').hidden = !a.lastError; $('agentErr').textContent = a.lastError ? 'Siklus terakhir: ' + a.lastError : '';
-  const key = JSON.stringify([s.policies.map((p) => p.id + p.status), s.reports.map((r) => r.eventId + r.paidCount)]);
+  const key = JSON.stringify([s.policies.map((p) => p.id + p.status), s.reports.map((r) => r.eventId + r.paidCount + (r.place || ''))]);
   if (key !== lastKey) { lastKey = key; drawMap(s); } // redraw only on change so open popups stay open
   drawTables(s); drawReplay(full);
   if (window.afterDraw) afterDraw(full);

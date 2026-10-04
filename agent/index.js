@@ -109,7 +109,7 @@ async function cycle({ submit = true } = {}) {
       // each attester takes its own look at the sources (separate fetch)
       const sigs = await collectSignatures(pool, attesters, report, async () => verifyProposal(report, (await observe()).matched));
       const rc = await chain.submitReport(pool, report, sigs);
-      saveSnapshot(report.eventId, { report: { ...report }, snapshot, tx: rc.hash });
+      saveSnapshot(report.eventId, { report: { ...report }, snapshot, place: pair.bmkg.place, tx: rc.hash });
       log(`  submitted, tx ${rc.hash}`);
       submitted++;
     } catch (e) {
@@ -131,7 +131,7 @@ async function replay(name) {
   log(`REPLAY ${fixture.name}: M${report.magX10 / 10} at ${report.latE4 / 1e4},${report.lonE4 / 1e4}`);
   const sigs = await collectSignatures(pool, attesters, report, async () => verifyReplay(report, fixture));
   const rc = await chain.submitReport(pool, report, sigs);
-  saveSnapshot(report.eventId, { report: { ...report }, snapshot, tx: rc.hash });
+  saveSnapshot(report.eventId, { report: { ...report }, snapshot, place: fixture.bmkg.place, tx: rc.hash });
   log(`  submitted, tx ${rc.hash}. Claims open after the challenge window (${await pool.challengeWindow()} s); then run: keeper`);
   return { eventId: report.eventId, tx: rc.hash, report };
 }

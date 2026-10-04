@@ -12,6 +12,7 @@ const agent = require('../agent/index');
 const chain = require('../agent/chain');
 const { seedPolicies, readLabels, writeLabels, ensureBalance, DEMO_POLICIES, E } = require('../scripts/demo');
 const usdtJ = require('../build/MockUSDT.json');
+const places = require('./places');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const POLL = agent.cfg.pollSec;
@@ -121,8 +122,9 @@ async function buildStatus() {
   const reports = [...index.reports.values()].map((r) => ({
     eventId: r.eventId, mag: r.magX10 / 10, lat: r.latE4 / 1e4, lon: r.lonE4 / 1e4, occurredAt: r.occurredAt,
     reportedAt: r.reportedAt, claimsOpenAt: r.reportedAt + Number(cw), simulated: r.simulated, vetoed: r.vetoed,
-    sourcesHash: r.sourcesHash, tx: r.tx, paidCount: r.paidCount, paidAmount: fmt(r.paidAmount),
+    sourcesHash: r.sourcesHash, tx: r.tx, paidCount: r.paidCount, paidAmount: fmt(r.paidAmount), place: places.placeOf(r.eventId),
   })).sort((a, b) => b.reportedAt - a.reportedAt);
+  places.resolve([...index.reports.values()]).catch(() => {}); // fills place names in the background
   const paidTotal = policies.filter((p) => p.status === 'paid').reduce((s, p) => s + p.coverage, 0);
   cache = {
     at: Date.now(),
