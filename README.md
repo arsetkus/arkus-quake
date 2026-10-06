@@ -19,7 +19,7 @@ Indonesia sits on the Ring of Fire and has a damaging earthquake almost every ye
 
 **Parametric insurance**: the payout is triggered by a measurable event (magnitude + distance), not by assessing losses.
 
-- **Sponsors** (local government, CSR programs, diaspora, NGOs) buy policies **for** residents. Beneficiaries only need an address: no wallet app, no gas, no claim.
+- **Policyholders** buy a policy for themselves: pick a location on the map, pay the premium, done. No forms, no document checks, no claim to file. The payout lands in the same wallet.
 - **Liquidity providers** fund a fully-collateralised pool and earn the premiums.
 - An **oracle agent** watches BMKG (Indonesia's agency) and USGS. A quake is reported only when **both agencies agree**, using the more conservative numbers.
 - **2-of-3 attesters** sign each report independently (EIP-712). Each attester re-fetches the data itself and refuses to sign anything it cannot confirm.
@@ -36,7 +36,7 @@ flowchart LR
   A -->|QuakeReport| AT3[Attester 3]
   AT1 & AT2 & AT3 -->|EIP-712 signatures| R[Relayer]
   R -->|submitReport| P[(ParametricQuakePool<br/>BSC)]
-  S[Sponsor] -->|buyPolicy + premium| P
+  S[Policyholder] -->|buyPolicy + premium| P
   LP[Liquidity provider] -->|deposit / withdraw| P
   K[Keeper] -->|claimBatch| P
   P -->|stablecoin payout| B[Beneficiary]
@@ -50,7 +50,7 @@ sequenceDiagram
   participant At as Attesters (2 of 3)
   participant C as Pool contract
   participant K as Keeper
-  participant W as Resident
+  participant W as Policyholder
   Q->>O: new quake in both feeds
   O->>O: agree? Δt ≤ 120 s, Δdist ≤ 150 km, ΔM ≤ 0.7, age ≥ 20 min
   O->>At: report (lower magnitude, BMKG location, USGS time)
@@ -101,8 +101,8 @@ Open [arkuss.app](https://arkuss.app) for the **live** state: real quakes report
 
 | Who | What they do on the dashboard |
 |---|---|
-| **Sponsor** (local government, CSR, diaspora) | **Beli polis**: connect a wallet (MetaMask, Trust, Binance Wallet; switches to BSC Testnet automatically), click the map to choose the protected location, set radius, magnitude threshold, coverage and duration. The premium is quoted live by the contract (`quotePremium`). One click gets test mUSDT from the faucet if needed, approves, and buys. An optional policy name is stored off-chain, proven by a signature from the sponsor wallet. |
-| **Resident** | **Cek polis**: paste an address to see its policies, status, payouts and mUSDT balance. |
+| **Policyholder** | **Beli polis**: connect a wallet (MetaMask, Trust, Binance Wallet; switches to BSC Testnet automatically), click the map to choose the protected location, set radius, magnitude threshold, coverage and duration. The premium is quoted live by the contract (`quotePremium`). One click gets test mUSDT from the faucet if needed, approves, and buys. An optional policy name is stored off-chain, proven by a signature from the buyer wallet. |
+| **Policyholder** (check) | **Cek polis**: paste an address to see its policies, status, payouts and mUSDT balance. |
 | **Liquidity provider** | **Jadi LP**: deposit or withdraw mUSDT, see pool share, free liquidity and the post-quake withdrawal lock. |
 | **Anyone** (on [/demo](https://arkuss.app/demo)) | **Simulasikan gempa M7.6**: the oracle replays Padang 2009, attesters sign, the report goes on-chain, the challenge window counts down, and the keeper pays every eligible policy, including ones you bought yourself. Every step links to BscScan. |
 
@@ -145,12 +145,12 @@ deployments/bsc-testnet.json       live contract addresses
 
 ## Known limitations (and the production path)
 
-- **Binary payout, no tiers yet.** A policy pays 100% of its coverage when the quake meets its magnitude threshold inside its radius, otherwise nothing. Sponsors already tune radius and threshold per policy (priced by `quotePremium`), but a resident just outside the radius gets nothing (basis risk). Next version: tiered payouts by distance and magnitude, e.g. 100% within 50 km, 50% within 100 km, 25% within 150 km.
+- **Binary payout, no tiers yet.** A policy pays 100% of its coverage when the quake meets its magnitude threshold inside its radius, otherwise nothing. Policyholders already tune radius and threshold per policy (priced by `quotePremium`), but a policyholder just outside the radius gets nothing (basis risk). Next version: tiered payouts by distance and magnitude, e.g. 100% within 50 km, 50% within 100 km, 25% within 150 km.
 - The owner can change attesters and threshold instantly. Production: owner = multisig + timelock.
 - The demo runs all attester keys in one process. Production: each attester is a separate institution and server (e.g. university, BPBD, insurer).
 - Premiums use a placeholder rate table (`ratePerYearBps`), not actuarial pricing.
 - If no keeper runs for more than 14 days after a policy ends, an eligible policy could be released unpaid. Anyone can run the keeper.
-- Beneficiaries still need an address (a custodial or embedded wallet can be created by the frontend).
+- Policyholders still need a wallet address (a custodial or embedded wallet can be created by the frontend).
 - Payout uses a test stablecoin; production would use a real stablecoin on BSC.
 
 ## License

@@ -130,7 +130,7 @@ body:not(.demo) #replayCard,body:not(.demo) #demoBanner{display:none} body.demo 
 <main class="wrap">
   <section class="hero">
     <h1>Gempa terjadi, dana cair ke warga dalam hitungan menit.</h1>
-    <p>Sponsor (Pemda, CSR, diaspora) membelikan polis untuk warga. Saat BMKG dan USGS sama-sama mengonfirmasi gempa di atas ambang dalam radius polis, smart contract membayar langsung. Tidak ada formulir klaim dan survei kerusakan, dan warga tidak perlu punya aplikasi kripto.</p>
+    <p>Pemegang polis cukup memilih lokasi, membayar premi, dan selesai. Saat BMKG dan USGS sama-sama mengonfirmasi gempa di atas ambang dalam radius polis, smart contract membayar langsung. Tidak ada formulir klaim dan survei kerusakan, dan tanpa verifikasi yang rumit.</p>
   </section>
 
   <div id="demoBanner" class="card banner"><div class="body">
@@ -182,15 +182,15 @@ body:not(.demo) #replayCard,body:not(.demo) #demoBanner{display:none} body.demo 
             <div class="f"><label>Masa polis</label><select id="bDur"><option value="30">30 hari</option><option value="90">90 hari</option><option value="180">180 hari</option><option value="365" selected>1 tahun</option></select></div>
           </div>
           <div class="f"><label>Nilai cair <span id="bFree"></span></label><input type="number" id="bCov" min="10" step="50" value="500" inputmode="decimal"></div>
-          <div class="f"><label>Alamat wallet penerima</label><input id="bBen" class="mono" placeholder="0x… (warga tidak perlu aplikasi)" autocomplete="off" spellcheck="false">
+          <div class="f"><label>Alamat wallet pemegang polis</label><input id="bBen" class="mono" placeholder="0x… (terisi otomatis dengan wallet kamu)" autocomplete="off" spellcheck="false">
             <a href="#" class="lnk" id="bBenMe">pakai alamat saya</a></div>
           <div class="f"><label>Nama polis <span>opsional</span></label><input id="bLabel" maxlength="40" placeholder="mis. Keluarga Pak Budi, Padang"></div>
-          <div class="quote"><span>Premi (dibayar sponsor)</span><b id="bPrem">–</b></div>
+          <div class="quote"><span>Premi (dibayar pemegang polis)</span><b id="bPrem">–</b></div>
           <button class="btn brand" id="bBuy">Hubungkan wallet</button>
           <div id="bMsg" class="msg" hidden></div>
         </div>
         <div class="body" data-p="check" hidden>
-          <div class="f"><label>Alamat penerima atau sponsor</label><input id="cAddr" class="mono" placeholder="0x…" autocomplete="off" spellcheck="false"></div>
+          <div class="f"><label>Alamat pemegang polis</label><input id="cAddr" class="mono" placeholder="0x…" autocomplete="off" spellcheck="false"></div>
           <div id="cOut"><p class="note">Masukkan alamat untuk melihat polis dan pembayaran yang diterima.</p></div>
         </div>
         <div class="body" data-p="lp" hidden>
@@ -257,7 +257,7 @@ body:not(.demo) #replayCard,body:not(.demo) #demoBanner{display:none} body.demo 
     <div class="card">
       <h2>Polis <span class="sp" id="pCount"></span></h2>
       <div class="tbl"><table>
-        <thead><tr><th>#</th><th>Penerima</th><th class="num">Radius</th><th class="num">Ambang</th><th class="num">Nilai cair</th><th>Status</th><th>Alamat penerima</th></tr></thead>
+        <thead><tr><th>#</th><th>Pemegang polis</th><th class="num">Radius</th><th class="num">Ambang</th><th class="num">Nilai cair</th><th>Status</th><th>Alamat pemegang polis</th></tr></thead>
         <tbody id="pBody"></tbody>
       </table></div>
     </div>

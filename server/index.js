@@ -198,7 +198,7 @@ async function setLabel(body) {
   if (!p) return [404, 'Polis belum terbaca, coba lagi sebentar'];
   let signer;
   try { signer = ethers.verifyMessage(labelMessage(id, label), String(body.signature || '')); } catch { return [400, 'Tanda tangan tidak valid'] }
-  if (signer.toLowerCase() !== p.sponsor.toLowerCase()) return [403, 'Hanya sponsor polis yang bisa memberi nama'];
+  if (signer.toLowerCase() !== p.sponsor.toLowerCase()) return [403, 'Hanya pembeli polis yang bisa memberi nama'];
   const labels = readLabels();
   if (labels[id]) return [409, 'Polis ini sudah punya nama'];
   labels[id] = label;

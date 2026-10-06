@@ -1,4 +1,4 @@
-// Participation panel: sponsors buy policies, residents check theirs, LPs deposit/withdraw.
+// Participation panel: policyholders buy policies for themselves, residents check theirs, LPs deposit/withdraw.
 // Runs after the dashboard script and reuses its globals ($, S, map, esc, nf, short, EXP, refresh).
 'use strict';
 (() => {
@@ -86,6 +86,7 @@
       W.signer = await bp.getSigner();
       W.addr = await W.signer.getAddress();
       if (!$('cAddr').value) { $('cAddr').value = W.addr; drawCheck(); }
+      if (!$('bBen').value) $('bBen').value = W.addr;
       await drawWallet();
       updateBuy(); drawLp();
       return true;
@@ -218,7 +219,7 @@
     if (!pick) b.textContent = 'Pilih lokasi di peta';
     else if (!p.covOk) b.textContent = 'Isi nilai cair';
     else if (p.cov > free) b.textContent = 'Nilai cair melebihi dana bebas pool';
-    else if (!ethers.isAddress($('bBen').value.trim())) b.textContent = 'Isi alamat penerima';
+    else if (!ethers.isAddress($('bBen').value.trim())) b.textContent = 'Isi alamat pemegang polis';
     else if (premium === null) b.textContent = 'Menghitung premi…';
     else { b.disabled = false; b.textContent = `Beli polis · ${Number(ethers.formatEther(premium)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} mUSDT`; }
   }
@@ -265,7 +266,7 @@
     const sim = new Set(S.reports.filter((r) => r.simulated).map((r) => r.eventId));
     const date = (t) => new Date(t * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
     $('cOut').innerHTML = `<p class="note" style="margin:0">Saldo mUSDT alamat ini: <b id="cBal">…</b></p>` + (mine.length ? mine.map((p) => {
-      const role = p.beneficiary.toLowerCase() === lo ? (p.sponsor.toLowerCase() === lo ? 'penerima & sponsor' : 'penerima') : 'sponsor';
+      const role = p.beneficiary.toLowerCase() === lo ? (p.sponsor.toLowerCase() === lo ? 'pemegang polis' : 'penerima') : 'pembeli';
       return `<div class="pol"><div class="t"><a href="#" data-fly="${p.id}">${esc(p.label || 'Polis #' + p.id)}</a>${tag[p.status === 'paid' && sim.has(p.paidEvent) ? 'sim' : p.status]}</div>
         <div class="m">Nilai cair <b>${nf.format(p.coverage)} mUSDT</b> · gempa M${p.minMag.toFixed(1)}+ dalam ${p.radiusKm} km</div>
         <div class="m">${p.status === 'paid' ? `Dibayar ${p.paidAt ? date(p.paidAt) : ''} · ${txLink(p.paidTx)}` : 'Berlaku sampai ' + date(p.end)} · kamu: ${role}</div></div>`;

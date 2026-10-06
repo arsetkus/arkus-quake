@@ -2,7 +2,7 @@
 
 [English](README.md) · **Bahasa Indonesia** · Live: https://arkuss.app · Demo presentasi: https://arkuss.app/demo
 
-Pool asuransi parametrik: sponsor (Pemda, CSR, diaspora) membelikan polis untuk warga. Kalau gempa dengan magnitudo ≥ ambang terjadi dalam radius polis, dana cair otomatis ke penerima tanpa klaim, tanpa survei. **Belum diaudit, bukan produk asuransi berizin.**
+Pool asuransi parametrik: pemegang polis membeli polis untuk dirinya sendiri, tanpa formulir dan tanpa verifikasi rumit. Kalau gempa dengan magnitudo ≥ ambang terjadi dalam radius polis, dana cair otomatis ke dompet pemegang polis tanpa klaim, tanpa survei. **Belum diaudit, bukan produk asuransi berizin.**
 
 ## Struktur
 
@@ -64,9 +64,9 @@ npm run agent:keeper     # bayar semua polis yang eligible
 
 ## Batasan yang perlu diketahui (untuk Q&A juri)
 
-- **Pencairan masih biner, belum bertingkat.** Polis cair 100% kalau gempa memenuhi ambang magnitudo di dalam radius, selain itu tidak cair sama sekali. Sponsor sudah bisa mengatur radius dan ambang per polis (premi dihitung `quotePremium`), tapi warga yang sedikit di luar radius tidak dapat apa-apa (*basis risk*). Versi berikutnya: pencairan bertingkat menurut jarak dan magnitudo, misalnya 100% dalam 50 km, 50% dalam 100 km, 25% dalam 150 km.
+- **Pencairan masih biner, belum bertingkat.** Polis cair 100% kalau gempa memenuhi ambang magnitudo di dalam radius, selain itu tidak cair sama sekali. Pemegang polis sudah bisa mengatur radius dan ambang per polis (premi dihitung `quotePremium`), tapi warga yang sedikit di luar radius tidak dapat apa-apa (*basis risk*). Versi berikutnya: pencairan bertingkat menurut jarak dan magnitudo, misalnya 100% dalam 50 km, 50% dalam 100 km, 25% dalam 150 km.
 - Owner bisa ganti attester/threshold seketika. Untuk produksi: owner = multisig + timelock.
 - Kalau keeper mati > 14 hari setelah polis berakhir, polis eligible bisa ter-release tanpa dibayar. Siapa pun bisa menjalankan keeper.
 - Harga premi masih placeholder, belum aktuaria.
 - Demo menyimpan semua key attester di satu proses. Produksi: tiap attester di server/lembaga berbeda.
-- Penerima masih butuh alamat wallet (bisa dibuatkan custodial/embedded oleh frontend).
+- Pemegang polis masih butuh alamat wallet (bisa dibuatkan custodial/embedded oleh frontend).
